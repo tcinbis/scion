@@ -366,16 +366,12 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		// session.Close()
 		qdbus.Session = nil
 	}()
-	fsession, ok := session.(quic.FlowTeleSession)
-	if !ok {
-		panic("Returned session is not flowtele sessions")
-	}
-	qdbus.Session = fsession
+	qdbus.Session = checkFlowTeleSession(session)
 
 	// open stream
-	// rateInBitsPerSecond := uint64(20 * 1000 * 1000)
-	// session.SetFixedRate(rateInBitsPerSecond)
-	// qdbus.Log("set fixed rate %f...", float64(rateInBitsPerSecond)/1000000)
+	//rateInBitsPerSecond := uint64(20 * 1000 * 1000)
+	//session.SetFixedRate(rateInBitsPerSecond)
+	//qdbus.Log("set fixed rate %f...", float64(rateInBitsPerSecond)/1000000)
 	qdbus.Log("session established. Opening stream...")
 	stream, err := session.OpenStreamSync(context.Background())
 	if err != nil {
@@ -386,7 +382,6 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		stream.Close()
 	}()
 	qdbus.Log("stream opened %d", stream.StreamID())
-
 	// continuously send 10MB messages to quic listener
 	message := make([]byte, 10000000)
 	for i := range message {
@@ -417,4 +412,12 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func checkFlowTeleSession(s quic.Session) quic.FlowTeleSession {
+	fs, ok := s.(quic.FlowTeleSession)
+	if !ok {
+		panic("Returned session is not flowtele sessions")
+	}
+	return fs
 }
