@@ -3,6 +3,12 @@ load("@bazel_gazelle//:deps.bzl", "go_repository")
 
 def go_deps():
     go_repository(
+        name = "com_github_godbus_dbus_v5",
+        importpath = "github.com/godbus/dbus/v5",
+        sum = "h1:ZqHaoEF7TBzh4jzPmqVhE/5A1z9of6orkAe5uHoAeME=",
+        version = "v5.0.3",
+    )
+    go_repository(
         name = "co_honnef_go_tools",
         importpath = "honnef.co/go/tools",
         sum = "h1:3JgtbtFHMiCmsznwGVTUWbgGov+pVqnlf1dEJTNAXeM=",
