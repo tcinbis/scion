@@ -47,6 +47,17 @@ var (
 	scionPathsIndex = flag.Int("paths-index", 0, "Index of the path to use in the --paths-file")
 )
 
+const (
+	Bit  = 1
+	KBit = 1000 * Bit
+	MBit = 1000 * KBit
+	GBit = 1000 * MBit
+
+	Byte  = 8 * Bit
+	KByte = 1000 * Byte
+	MByte = 1000 * KByte
+)
+
 func init() {
 	flag.Var(&localIAFlag, "local-ia", "ISD-AS address to listen on")
 	flag.Var(&remoteIAFlag, "remote-ia", "ISD-AS address to connect to")
@@ -387,6 +398,8 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	for i := range message {
 		message[i] = 42
 	}
+	qdbus.Log("Setting rate...")
+	checkFlowTeleSession(qdbus.Session).SetFixedRate((1 * MBit))
 	sentBytes := 0
 	for {
 		if *maxData == 0 {

@@ -5,7 +5,6 @@ require (
 	github.com/antlr/antlr4 v0.0.0-20181218183524-be58ebffde8e
 	github.com/bazelbuild/rules_go v0.27.0
 	github.com/buildkite/go-buildkite v2.2.1-0.20190413010238-568b6651b687+incompatible
-	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/dchest/cmac v0.0.0-20150527144652-62ff55a1048c
 	github.com/deepmap/oapi-codegen v1.6.1
 	github.com/fatih/color v1.9.0
@@ -62,6 +61,6 @@ replace github.com/nxadm/tail => github.com/lukedirtwalker/tail v1.3.1-0.2019091
 
 replace github.com/smartystreets/goconvey => github.com/kormat/goconvey v0.0.0-20191113114839-63cc4eee0dbc
 
-replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2
+replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-flowtele
 
 go 1.14
