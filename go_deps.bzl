@@ -961,7 +961,7 @@ def go_deps():
         importpath = "github.com/lucas-clemente/quic-go",
         remote = "https://github.com/tcinbis/quic-go",
         vcs = "git",
-        commit = "d5c0275836e4a0b52013ba7394ca3be693e08600",
+        commit = "25f9112ce07b2a7a9d6ce2455b8103dbde80b065",
     )
     go_repository(
         name = "com_github_lunixbochs_vtclean",
