@@ -55,6 +55,7 @@ func initTlsCert() error {
 		return err
 	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
+	tlsConfig.NextProtos = []string{"Flowtele",}
 	return nil
 }
 

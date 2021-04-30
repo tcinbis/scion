@@ -122,7 +122,7 @@ func (db *DbusBase) Send(s DbusSignal) error {
 			}
 			switch t {
 			case Rtt:
-				db.Log("RTT (skipped %d) srtt = %.1fms", nSkipped, float32(s.Values()[3].(uint32))/1000)
+				db.Log("RTT (skipped %d) srtt = %.5fms", nSkipped, float32(s.Values()[3].(uint32))/1000)
 			case Lost:
 				db.Log("Lost (skipped %d) ssthresh = %d", nSkipped, s.Values()[3])
 			case Cwnd:
