@@ -113,9 +113,9 @@ rules_antlr_dependencies("4.7.2")
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "58636bf623c8ccd2c0d70a6b108619a2f07bc284ad270a6b21fb635d4dd1ecfc",
-    strip_prefix = "rules_docker-6c29619903b6bc533ad91967f41f2a3448758e6f",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/6c29619903b6bc533ad91967f41f2a3448758e6f.tar.gz"],
+    sha256 = "59d5b42ac315e7eadffa944e86e90c2990110a1c8075f1cd145f487e999d22b3",
+    strip_prefix = "rules_docker-0.17.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.17.0/rules_docker-v0.17.0.tar.gz"],
 )
 
 load("@io_bazel_rules_docker//repositories:repositories.bzl", container_repositories = "repositories")
