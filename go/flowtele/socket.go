@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/csv"
 	"flag"
 	"fmt"
 	"math"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/scionproto/scion/go/flowtele/dbus/datalogger"
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/flowtele"
@@ -49,23 +49,13 @@ var (
 	sciondAddrFlag  = flag.String("sciond", sd.DefaultAPIAddress, "SCIOND address")
 	scionPathsFile  = flag.String("paths-file", "", "File containing a list of SCION paths to the destination")
 	scionPathsIndex = flag.Int("paths-index", 0, "Index of the path to use in the --paths-file")
-	rate 			= flag.Uint64("rate", 0, "Fixed rate in Mbits/s")
+	rate            = flag.Uint64("rate", 0, "Fixed rate in Mbits/s")
 )
 
 var (
 	sigs = make(chan os.Signal, 1)
 	done = make(chan bool, 1)
 )
-
-type writerData struct {
-	id int32
-	t time.Time
-	srtt time.Duration
-}
-
-func (d *writerData) String() []string{
-	return []string{strconv.Itoa(int(d.id)), strconv.Itoa(int( d.t.Unix())), d.srtt.String()}
-}
 
 const (
 	Bit  = 1
@@ -308,13 +298,24 @@ func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsCo
 }
 
 func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int32, applyControl bool, errChannel chan error) error {
+	// capture interrupts to gracefully terminate run
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		defer log.HandlePanic()
 		sig := <-sigs
-		fmt.Printf("%v\n",sig)
+		fmt.Printf("%v\n", sig)
 		close(done)
 	}()
+
+	// setup datalogger
+	dLogger := datalogger.NewDbusDataLogger(
+		fmt.Sprintf("rtt-samples-%d.csv", time.Now().Unix()), []string{"flowID", "nanoTimestamp", "nanoSRTT"},
+		[]string{"src", "dest"},
+	)
+	defer dLogger.Close()
+	dLogger.SetMetadata([]string{localAddr.String(), remoteAddr.String()})
+	dLogger.Run()
+
 	// start dbus
 	qdbus := flowteledbus.NewQuicDbus(flowId, applyControl)
 	qdbus.SetMinIntervalForAllSignals(5 * time.Millisecond)
@@ -326,21 +327,6 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	if err := qdbus.Register(); err != nil {
 		return err
 	}
-	file, err := os.Create(fmt.Sprintf("rtt-samples-%d.csv", time.Now().Unix()))
-	checkError(err)
-	writerChan := make(chan writerData, 100)
-	csvWriter := csv.NewWriter(file)
-	defer csvWriter.Flush()
-
-	fmt.Println("Sending to writerChan")
-	checkError(csvWriter.Write([]string{"flowID", "timestamp", "srtt"}))
-	go func() {
-		defer log.HandlePanic()
-		for s := range writerChan {
-			checkError(csvWriter.Write(s.String()))
-		}
-		csvWriter.Flush()
-	}()
 
 	// signal forwarding functions
 	newSrttMeasurement := func(t time.Time, srtt time.Duration) {
@@ -353,7 +339,7 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 			panic("srtt does not fit in uint32")
 		}
 		signal := flowteledbus.CreateQuicDbusSignalRtt(flowId, t, uint32(srtt.Microseconds()))
-		writerChan <- writerData{flowId, t, srtt}
+		dLogger.Send(&datalogger.RTTData{FlowID: int(flowId), Timestamp: t, SRtt: srtt})
 		if qdbus.ShouldSendSignal(signal) {
 			if err := qdbus.Send(signal); err != nil {
 				fmt.Printf("srtt -> %d\n", qdbus.FlowId)
@@ -408,7 +394,7 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	// make QUIC idle timout long to allow a delay between starting the listeners and the senders
 	quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
 		FlowTeleSignal: flowteleSignalInterface}
-	tlsConfig := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"Flowtele",}}
+	tlsConfig := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"Flowtele"}}
 
 	// setup quic session
 	session, err := establishQuicSession(localAddr, remoteAddr, tlsConfig, quicConfig)
@@ -442,18 +428,18 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		message[i] = 42
 	}
 
-	if *rate > 0{
+	if *rate > 0 {
 		qdbus.Log("Setting rate to %d Mbit/s", *rate)
 		checkFlowTeleSession(qdbus.Session).SetFixedRate(*rate * MBit)
 	}
 
 	sentBytes := 0
 
-	loop:
-		for {
+loop:
+	for {
 		select {
-			case <- done:
-				break loop
+		case <-done:
+			break loop
 		default:
 			if *maxData == 0 {
 				_, err = stream.Write(message)
@@ -489,7 +475,7 @@ func checkFlowTeleSession(s quic.Session) quic.FlowTeleSession {
 	return fs
 }
 
-func checkError(err error){
+func checkError(err error) {
 	if err != nil {
 		fmt.Printf("Error occured: %v\n", err)
 	}
