@@ -11,7 +11,7 @@ build: bazel
 # is git controlled, and therefore this is only necessary when changing the
 # sources for the code generation.
 # Note: built in correct order, because .NOTPARALLEL.
-all: go_deps.bzl protobuf mocks gazelle licenses build antlr
+all: bazel-cache go_deps.bzl protobuf mocks gazelle licenses build antlr
 
 clean:
 	bazel clean
@@ -71,3 +71,6 @@ golangci-lint:
 
 golden:
 	./tools/update_testdata.sh
+
+bazel-cache:
+	./scion.sh bazel_remote
