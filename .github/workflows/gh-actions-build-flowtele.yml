@@ -9,12 +9,14 @@ jobs:
         with:
           go-version: 1.14
           stable: true
-      - name: Install bazelisk
-        run: curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.8.1/bazelisk-linux-amd64 -o bazelisk-linux && chmod +x bazelisk-linux && ./bazelisk-linux
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Install docker
-        run: sudo bash ${{ github.workspace }}/tools/install_docker
+      - name: Install docker and bazel
+        run: sudo bash ${{ github.workspace }}/tools/install_docker && sudo bash ${{ github.workspace }}/tools/install_bazel && bash ${{ github.workspace }}/scion.sh bazel_remote
+      - name: Installing project deps
+        run: sudo apt install make capnproto python3 python3-dev -y && bash ${{ github.workspace }}/env/deps
+      - name: Run make all
+        run: make -C ${{ github.workspace }} all 
 #   Explore-GitHub-Actions:
 #     runs-on: ubuntu-latest
 #     steps:
