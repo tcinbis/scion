@@ -18,18 +18,16 @@ jobs:
       - name: Installing project deps
         run: sudo DEBIAN_FRONTEND=noninteractive apt install make capnproto bridge-utils build-essential capnproto cgroup-tools curl g++ gcc git jq make moreutils net-tools python3-pip python3-setuptools python3-wheel software-properties-common sqlite3 sudo tzdata zlib1g-dev -y && mkdir -p /home/runner/.local && sudo chown -R runner:runner /home/runner/.local&& pip3 install -r ${{ github.workspace }}/env/pip3/requirements.txt
       - name: Run make all
-        run: make -C ${{ github.workspace }} all 
-#   Explore-GitHub-Actions:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-#       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-#       - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-#       - name: Check out repository code
-#         uses: actions/checkout@v2
-#       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-#       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-#       - name: List files in the repository
-#         run: |
-#           ls ${{ github.workspace }}
-#       - run: echo "🍏 This job's status is ${{ job.status }}."
+        run: make -C ${{ github.workspace }} all
+      - name: Cache build results
+        uses: actions/cache@v2.1.5
+        with:
+          path: |
+            ${{ github.workspace }}/bazel-bin
+            ${{ github.workspace }}/bazel-out
+            ${{ github.workspace }}/bazel-scion
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v2.2.3
+        with:
+          name: flowtele-artifacts
+          path: ${{ github.workspace }}/bazel-bin/go/flowtele
