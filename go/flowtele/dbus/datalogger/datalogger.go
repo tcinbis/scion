@@ -77,7 +77,11 @@ func (d *DbusDataLogger) Run() {
 }
 
 func (r *RTTData) Strings() []string {
-	return []string{strconv.Itoa(r.FlowID), strconv.Itoa(int(r.Timestamp.UnixNano())), strconv.Itoa(int(r.SRtt.Nanoseconds()))}
+	return []string{strconv.Itoa(r.FlowID), strconv.Itoa(int(UnixMicroseconds(r.Timestamp))), strconv.Itoa(int(r.SRtt.Microseconds()))}
+}
+
+func UnixMicroseconds(t time.Time) int64 {
+	return t.UnixNano() / 1e3
 }
 
 func check(err error) {

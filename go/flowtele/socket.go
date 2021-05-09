@@ -50,6 +50,7 @@ var (
 	scionPathsFile  = flag.String("paths-file", "", "File containing a list of SCION paths to the destination")
 	scionPathsIndex = flag.Int("paths-index", 0, "Index of the path to use in the --paths-file")
 	rate            = flag.Uint64("rate", 0, "Fixed rate in Mbits/s")
+	csvFilePrefix   = flag.String("csv-prefix", "rtt", "File prefix to use for writing the CSV file.")
 )
 
 var (
@@ -309,7 +310,7 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 
 	// setup datalogger
 	dLogger := datalogger.NewDbusDataLogger(
-		fmt.Sprintf("rtt-samples-%d.csv", time.Now().Unix()), []string{"flowID", "nanoTimestamp", "nanoSRTT"},
+		fmt.Sprintf("%s-samples-%d.csv", *csvFilePrefix, time.Now().Unix()), []string{"flowID", "microTimestamp", "microSRTT"},
 		[]string{"src", "dest"},
 	)
 	defer dLogger.Close()
@@ -347,6 +348,7 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 			}
 		}
 	}
+
 	packetsLost := func(t time.Time, newSlowStartThreshold uint64) {
 		if qdbus.Conn == nil {
 			// ignore signals if the session bus is not connected

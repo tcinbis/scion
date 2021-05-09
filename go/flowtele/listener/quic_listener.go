@@ -8,7 +8,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
@@ -42,6 +44,11 @@ var (
 	sciondAddrFlag = flag.String("sciond", sd.DefaultAPIAddress, "SCIOND address")
 )
 
+var (
+	sigs = make(chan os.Signal, 1)
+	done = make(chan struct{}, 1)
+)
+
 func init() {
 	flag.Var(&localIAFlag, "local-ia", "ISD-AS address to listen on")
 }
@@ -55,7 +62,7 @@ func initTlsCert() error {
 		return err
 	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
-	tlsConfig.NextProtos = []string{"Flowtele",}
+	tlsConfig.NextProtos = []string{"Flowtele"}
 	return nil
 }
 
@@ -118,8 +125,21 @@ func getPort(addr net.Addr) (int, error) {
 }
 
 func listenOnStream(session quic.Session, stream quic.Stream) error {
-	// defer stream.Close()
-	defer session.CloseWithError(errorNoError, "")
+	defer func() {
+		log.HandlePanic()
+		fmt.Printf("Closing stream: %d\n", stream.StreamID())
+		if err := stream.Close(); err != nil {
+			fmt.Printf("Error closing stream: %v\n", err)
+		}
+	}()
+	defer func() {
+		log.HandlePanic()
+		fmt.Printf("Closing session: %s\n", session.RemoteAddr().String())
+		if err := session.CloseWithError(errorNoError, ""); err != nil {
+			fmt.Printf("Error closing session: %v\n", err)
+		}
+	}()
+
 	message := make([]byte, *messageSize)
 	tInit := time.Now()
 	nTot := 0
@@ -134,31 +154,49 @@ func listenOnStream(session quic.Session, stream quic.Stream) error {
 		return err
 	}
 	fmt.Printf("%d_%d: Listening on Stream %d\n", lPort, rPort, stream.StreamID())
+
+loop:
 	for {
-		tStart := time.Now()
-		n, err := io.ReadFull(stream, message)
-		if err != nil {
-			if err == io.ErrUnexpectedEOF {
-				// sender stopped sending
-				return nil
-			} else {
-				return fmt.Errorf("Error reading message: %s\n", err)
+		select {
+		case <-done:
+			break loop
+		default:
+			tStart := time.Now()
+			n, err := io.ReadFull(stream, message)
+			if err != nil {
+				if err == io.ErrUnexpectedEOF {
+					// sender stopped sending
+					return nil
+				} else {
+					return fmt.Errorf("Error reading message: %s\n", err)
+				}
 			}
+			tEnd := time.Now()
+			nTot += n
+			tCur := tEnd.Sub(tStart).Seconds()
+			tTot := tEnd.Sub(tInit).Seconds()
+			// Mbit/s
+			curRate := float64(n) / tCur / 1000000.0 * 8.0
+			totRate := float64(nTot) / tTot / 1000000.0 * 8.0
+			fmt.Printf("%d_%d cur: %.1fMbit/s or %.1f MByte/s (%.1fMB in %.2fs), tot: %.1fMbit/s (%.1fMB in %.2fs)\n", lPort, rPort, curRate, curRate/8, float64(n)/1000000, tCur, totRate, float64(nTot)/1000000, tTot)
 		}
-		tEnd := time.Now()
-		nTot += n
-		tCur := tEnd.Sub(tStart).Seconds()
-		tTot := tEnd.Sub(tInit).Seconds()
-		// Mbit/s
-		curRate := float64(n) / tCur / 1000000.0 * 8.0
-		totRate := float64(nTot) / tTot / 1000000.0 * 8.0
-		fmt.Printf("%d_%d cur: %.1fMbit/s or %.1f MByte/s (%.1fMB in %.2fs), tot: %.1fMbit/s (%.1fMB in %.2fs)\n", lPort, rPort, curRate, curRate/8, float64(n)/1000000, tCur, totRate, float64(nTot)/1000000, tTot)
 	}
+	return nil
 }
 
 func main() {
 	flag.Parse()
 	errs := make(chan error)
+
+	// capture interrupts to gracefully terminate run
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		defer log.HandlePanic()
+		sig := <-sigs
+		fmt.Printf("%v\n", sig)
+		close(done)
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(*portRange * *nConnections)
 	for i := 0; i < *portRange; i++ {
@@ -183,6 +221,7 @@ func main() {
 					if err := listenOnStream(se, st); err != nil {
 						errs <- err
 					}
+					fmt.Printf("Function listenOnStream for %v returned.\n", se.RemoteAddr().String())
 				}(session, stream)
 			}
 		}(*listenPort + i)
