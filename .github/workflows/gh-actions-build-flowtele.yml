@@ -4,6 +4,8 @@ jobs:
   Build-Project:
     runs-on: ubuntu-18.04
     steps:
+      - name: Who am I? 🔎
+        run: id
       - name: Setup Go environment
         uses: actions/setup-go@v2.1.3
         with:
@@ -14,7 +16,7 @@ jobs:
       - name: Install docker and bazel
         run: sudo bash ${{ github.workspace }}/tools/install_docker && sudo bash ${{ github.workspace }}/tools/install_bazel && bash ${{ github.workspace }}/scion.sh bazel_remote
       - name: Installing project deps
-        run: sudo apt install make capnproto python3 python3-dev -y && bash ${{ github.workspace }}/env/deps
+        run: sudo DEBIAN_FRONTEND=noninteractive apt install make capnproto bridge-utils build-essential capnproto cgroup-tools curl g++ gcc git jq make moreutils net-tools python3-pip python3-setuptools python3-wheel software-properties-common sqlite3 sudo tzdata zlib1g-dev -y && pip3 install -r ${{ github.workspace }}/env/pip3/requirements.txt
       - name: Run make all
         run: make -C ${{ github.workspace }} all 
 #   Explore-GitHub-Actions:
