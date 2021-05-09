@@ -11,7 +11,7 @@ build: bazel
 # is git controlled, and therefore this is only necessary when changing the
 # sources for the code generation.
 # Note: built in correct order, because .NOTPARALLEL.
-all: bazel-cache go_deps.bzl gogen protobuf mocks gazelle licenses build antlr
+all: bazel-cache go_deps.bzl gogen protobuf mocks gazelle licenses build antlr flowtele
 
 clean:
 	bazel clean
