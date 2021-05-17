@@ -24,33 +24,47 @@ import (
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
 	"github.com/scionproto/scion/go/lib/sock/reliable"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
+
+func IAWrapper(s kingpin.Settings) (target *addr.IA) {
+	target = &addr.IA{}
+	s.SetValue(target)
+	return
+}
+
+func ScionPathWrapper(s kingpin.Settings) (target *scionPathDescription) {
+	target = &scionPathDescription{}
+	s.SetValue(target)
+	return
+}
 
 var (
 	localIAFlag, remoteIAFlag addr.IA
 	scionPath                 scionPathDescription
 
-	remoteIpFlag       = flag.String("ip", "127.0.0.1", "IP address to connect to")
-	remotePortFlag     = flag.Int("port", 5500, "Port number to connect to")
-	useRemotePortRange = flag.Bool("port-range", false, "Use increasing (remote) port numbers for additional QUIC senders")
-	localIpFlag        = flag.String("local-ip", "", "IP address to listen on (required for SCION)")
-	localPortFlag      = flag.Int("local-port", 0, "Port number to listen on (required for SCION)")
-	useLocalPortRange  = flag.Bool("local-port-range", true, "Use increasing local port numbers for additional QUIC senders")
-	quicSenderOnly     = flag.Bool("quic-sender-only", false, "Only start the quic sender")
-	fshaperOnly        = flag.Bool("fshaper-only", false, "Only start the fshaper")
-	quicDbusIndex      = flag.Int("quic-dbus-index", 0, "index of the quic sender dbus name")
-	nConnections       = flag.Int("num", 2, "Number of QUIC connections")
-	noApplyControl     = flag.Bool("no-apply-control", false, "Do not forward apply-control calls from fshaper to this QUIC connection (useful to ensure the calibrator flow is not influenced by vAlloc)")
-	mode               = flag.String("mode", "fetch", "the sockets mode of operation: fetch, quic, fshaper")
-	maxData            = flag.Int("max-data", 0, "the maximum amount of data that should be transmitted on each QUIC flow (0 means no limit)")
+	remoteIpFlag       = kingpin.Flag("ip", "IP address to connect to").Default("127.0.0.1").String()
+	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("5500").Int()
+	useRemotePortRange = kingpin.Flag("port-range", "Use increasing (remote) port numbers for additional QUIC senders").Default("false").Bool()
+	localIpFlag        = kingpin.Flag("local-ip", "IP address to listen on (required for SCION)").Default("").String()
+	localPortFlag      = kingpin.Flag("local-port", "Port number to listen on (required for SCION)").Default("0").Int()
+	useLocalPortRange  = kingpin.Flag("local-port-range", "Use increasing local port numbers for additional QUIC senders").Default("true").Bool()
+	quicSenderOnly     = kingpin.Flag("quic-sender-only", "Only start the quic sender").Default("false").Bool()
+	fshaperOnly        = kingpin.Flag("fshaper-only", "Only start the fshaper").Default("false").Bool()
+	quicDbusIndex      = kingpin.Flag("quic-dbus-index", "index of the quic sender dbus name").Default("0").Int()
+	nConnections       = kingpin.Flag("num", "Number of QUIC connections").Default("2").Int()
+	noApplyControl     = kingpin.Flag("no-apply-control", "Do not forward apply-control calls from fshaper to this QUIC connection (useful to ensure the calibrator flow is not influenced by vAlloc)").Default("false").Bool()
+	mode               = kingpin.Flag("mode", "the sockets mode of operation: fetch, quic, fshaper").Default("fetch").String()
+	maxData            = kingpin.Flag("max-data", "the maximum amount of data that should be transmitted on each QUIC flow (0 means no limit)").Default("0").Int()
 
-	useScion        = flag.Bool("scion", false, "Open scion quic sockets")
-	dispatcherFlag  = flag.String("dispatcher", "", "Path to dispatcher socket")
-	sciondAddrFlag  = flag.String("sciond", sd.DefaultAPIAddress, "SCIOND address")
-	scionPathsFile  = flag.String("paths-file", "", "File containing a list of SCION paths to the destination")
-	scionPathsIndex = flag.Int("paths-index", 0, "Index of the path to use in the --paths-file")
-	rate            = flag.Uint64("rate", 0, "Fixed rate in Mbits/s")
-	csvFilePrefix   = flag.String("csv-prefix", "rtt", "File prefix to use for writing the CSV file.")
+	useScion        = kingpin.Flag("scion", "Open scion quic sockets").Default("false").Bool()
+	dispatcherFlag  = kingpin.Flag("dispatcher", "Path to dispatcher socket").Default("").String()
+	sciondAddrFlag  = kingpin.Flag("sciond", "SCIOND address").Default(sd.DefaultAPIAddress).String()
+	scionPathsFile  = kingpin.Flag("paths-file", "File containing a list of SCION paths to the destination").Default("").String()
+	scionPathsIndex = kingpin.Flag("paths-index", "Index of the path to use in the --paths-file").Default("0").Int()
+
+	rate          = kingpin.Flag("rate", "Fixed rate in Mbits/s").Default("0").Uint64()
+	csvFilePrefix = kingpin.Flag("csv-prefix", "File prefix to use for writing the CSV file.").Default("rtt").String()
 )
 
 var (
@@ -70,13 +84,13 @@ const (
 )
 
 func init() {
-	flag.Var(&localIAFlag, "local-ia", "ISD-AS address to listen on")
-	flag.Var(&remoteIAFlag, "remote-ia", "ISD-AS address to connect to")
-	flag.Var(&scionPath, "path", "SCION path to use")
+	localIAFlag = *IAWrapper(kingpin.Flag("local-ia", "ISD-AS address to listen on."))
+	remoteIAFlag = *IAWrapper(kingpin.Flag("remote-ia", "ISD-AS address to connect to."))
+	scionPath = *ScionPathWrapper(kingpin.Flag("path", "SCION path to use."))
 }
 
 func main() {
-	flag.Parse()
+	kingpin.Parse()
 	// first run
 	// python3.6 athena_m2.py 2
 	// clear; go run go/flowtele/quic_listener.go --num 3

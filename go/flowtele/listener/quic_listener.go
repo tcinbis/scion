@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"flag"
 	"fmt"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"io"
 	"net"
 	"os"
@@ -27,21 +27,27 @@ const (
 	errorNoError quic.ErrorCode = 0x100
 )
 
+func IAWrapper(s kingpin.Settings) (target *addr.IA) {
+	target = &addr.IA{}
+	s.SetValue(target)
+	return
+}
+
 var (
 	tlsConfig   tls.Config
 	localIAFlag addr.IA
 
-	listenAddr   = flag.String("ip", "127.0.0.1", "IP address to listen on")
-	listenPort   = flag.Int("port", 5500, "Port number to listen on")
-	nConnections = flag.Int("num", 12, "Number of QUIC connections allowed per port number")
-	portRange    = flag.Int("port-range", 1, "Number of ports (increasing from --port) that are accepting QUIC connections")
-	keyPath      = flag.String("key", "go/flowtele/tls.key", "TLS key file")
-	pemPath      = flag.String("pem", "go/flowtele/tls.pem", "TLS certificate file")
-	messageSize  = flag.Int("message-size", 10000000, "size of the message that should be received as a whole")
+	listenAddr   = kingpin.Flag("ip", "IP address to listen on").Default("127.0.0.1").String()
+	listenPort   = kingpin.Flag("port", "Port number to listen on").Default("5500").Int()
+	nConnections = kingpin.Flag("num", "Number of QUIC connections allowed per port number").Default("12").Int()
+	portRange    = kingpin.Flag("port-range", "Number of ports (increasing from --port) that are accepting QUIC connections").Default("1").Int()
+	keyPath      = kingpin.Flag("key", "TLS key file").Default("go/flowtele/tls.key").String()
+	pemPath      = kingpin.Flag("pem", "TLS certificate file").Default("go/flowtele/tls.pem").String()
+	messageSize  = kingpin.Flag("message-size", "size of the message that should be received as a whole").Default("10000000").Int()
 
-	useScion       = flag.Bool("scion", false, "Open scion quic sockets")
-	dispatcherFlag = flag.String("dispatcher", "", "Path to dispatcher socket")
-	sciondAddrFlag = flag.String("sciond", sd.DefaultAPIAddress, "SCIOND address")
+	useScion       = kingpin.Flag("scion", "Open scion quic sockets").Default("false").Bool()
+	dispatcherFlag = kingpin.Flag("dispatcher", "Path to dispatcher socket").Default("").String()
+	sciondAddrFlag = kingpin.Flag("sciond", "SCIOND address").Default(sd.DefaultAPIAddress).String()
 )
 
 var (
@@ -50,7 +56,7 @@ var (
 )
 
 func init() {
-	flag.Var(&localIAFlag, "local-ia", "ISD-AS address to listen on")
+	localIAFlag = *IAWrapper(kingpin.Flag("local-ia", "ISD-AS address to listen on"))
 }
 
 // create certificate and key with
@@ -185,7 +191,7 @@ loop:
 }
 
 func main() {
-	flag.Parse()
+	kingpin.Parse()
 	errs := make(chan error)
 
 	// capture interrupts to gracefully terminate run

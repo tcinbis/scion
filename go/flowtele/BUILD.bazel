@@ -1,4 +1,5 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("//lint:go.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary")
 load("//:scion.bzl", "scion_go_binary")
 
 go_library(
@@ -21,6 +22,7 @@ go_library(
         "//go/lib/sock/reliable:go_default_library",
         "@com_github_lucas_clemente_quic_go//:go_default_library",
         "@com_github_lucas_clemente_quic_go//flowtele:go_default_library",
+        "@in_gopkg_alecthomas_kingpin_v2//:go_default_library",
     ],
 )
 

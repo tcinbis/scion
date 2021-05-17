@@ -54,6 +54,7 @@ require (
 	google.golang.org/grpc v1.38.1
 	google.golang.org/grpc/examples v0.0.0-20210630181457-52546c5d89b7
 	google.golang.org/protobuf v1.26.0
+	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v2 v2.4.0
 )
 
