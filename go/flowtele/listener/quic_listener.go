@@ -100,8 +100,7 @@ func getQuicListener(lAddr *net.UDPAddr) (quic.Listener, error) {
 	}
 }
 
-func acceptStream(listener quic.Listener) (quic.Session, quic.Stream, error) {
-	ctx := context.Background()
+func acceptStream(listener quic.Listener, ctx context.Context) (quic.Session, quic.Stream, error) {
 	session, err := listener.Accept(ctx)
 	if err != nil {
 		fmt.Printf("Error accepting sessions: %s\n", err)
@@ -199,7 +198,7 @@ func main() {
 	go func() {
 		defer log.HandlePanic()
 		sig := <-sigs
-		fmt.Printf("%v\n", sig)
+		fmt.Printf("Received: %v\n", sig)
 		close(done)
 	}()
 
@@ -215,8 +214,20 @@ func main() {
 			}
 			// defer listener.Close()
 			fmt.Printf("Listening for QUIC connections on %s\n", listener.Addr().String())
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				defer log.HandlePanic()
+			loop:
+				for {
+					select {
+					case <-done:
+						cancel()
+						break loop
+					}
+				}
+			}()
 			for j := 0; j < *nConnections; j++ {
-				session, stream, err := acceptStream(listener)
+				session, stream, err := acceptStream(listener, ctx)
 				if err != nil {
 					errs <- err
 					return
@@ -224,6 +235,21 @@ func main() {
 				go func(se quic.Session, st quic.Stream) {
 					defer log.HandlePanic()
 					defer wg.Done()
+
+					go func() {
+						defer log.HandlePanic()
+						for range done {
+							if err := stream.Close(); err != nil {
+								fmt.Printf("Error closing stream: %v\n", err)
+							}
+							fmt.Printf("Closed stream.\n")
+							if err := session.CloseWithError(errorNoError, "Interrupt received."); err != nil {
+								fmt.Printf("Error closing session: %v\n", err)
+							}
+							fmt.Printf("Closed session.\n")
+						}
+					}()
+
 					if err := listenOnStream(se, st); err != nil {
 						errs <- err
 					}

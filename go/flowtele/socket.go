@@ -27,6 +27,10 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+const (
+	errorNoError quic.ErrorCode = 0x100
+)
+
 func IAWrapper(s kingpin.Settings) (target *addr.IA) {
 	target = &addr.IA{}
 	s.SetValue(target)
@@ -429,13 +433,30 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	//session.SetFixedRate(rateInBitsPerSecond)
 	//qdbus.Log("set fixed rate %f...", float64(rateInBitsPerSecond)/1000000)
 	qdbus.Log("session established. Opening stream...")
-	stream, err := session.OpenStreamSync(context.Background())
+	ctx, cancelStream := context.WithCancel(context.Background())
+	go func() {
+		defer log.HandlePanic()
+	loop:
+		for {
+			select {
+			case <-done:
+				cancelStream()
+				if err := session.CloseWithError(errorNoError, "Interrupt received."); err != nil {
+					fmt.Printf("Error closing session: %v\n", err)
+				}
+				break loop
+			}
+		}
+	}()
+	stream, err := session.OpenStreamSync(ctx)
 	if err != nil {
 		return fmt.Errorf("Error opening QUIC stream to [%s]: %s", remoteAddr.String(), err)
 	}
 	defer func() {
 		fmt.Println("closing stream")
-		stream.Close()
+		if err := stream.Close(); err != nil {
+			fmt.Printf("Deffered Error closing stream: %v\n", err)
+		}
 	}()
 	qdbus.Log("stream opened %d", stream.StreamID())
 	// continuously send 10MB messages to quic listener
