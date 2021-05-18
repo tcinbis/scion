@@ -6,10 +6,11 @@ services:
       [
         "--max_size=50",
         "--experimental_remote_asset_api",
-        "--host=127.0.0.1",
+        "--host=0.0.0.0",
         "--profile_port=0",
       ]
-    network_mode: host
+    ports:
+        - 9092:9092
     image: buchgr/bazel-remote-cache:v2.0.1
     user: $USER_ID:$GROUP_ID
     volumes:
