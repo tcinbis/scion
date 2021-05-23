@@ -24,6 +24,9 @@ bazel:
 	tar -kxf bazel-bin/scion-ci.tar -C bin
 
 flowtele:
+	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\*
+
+flowtele-debug:
 	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\* --sandbox_debug
 
 test:

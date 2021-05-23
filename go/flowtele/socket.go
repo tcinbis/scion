@@ -31,21 +31,9 @@ const (
 	errorNoError quic.ErrorCode = 0x100
 )
 
-func IAWrapper(s kingpin.Settings) (target *addr.IA) {
-	target = &addr.IA{}
-	s.SetValue(target)
-	return
-}
-
-func ScionPathWrapper(s kingpin.Settings) (target *scionPathDescription) {
-	target = &scionPathDescription{}
-	s.SetValue(target)
-	return
-}
-
 var (
-	localIAFlag, remoteIAFlag addr.IA
-	scionPath                 scionPathDescription
+	localIAFromFlag, remoteIAFromFlag addr.IA
+	scionPath                         scionPathDescription
 
 	remoteIpFlag       = kingpin.Flag("ip", "IP address to connect to").Default("127.0.0.1").String()
 	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("5500").Int()
@@ -69,6 +57,9 @@ var (
 
 	rate          = kingpin.Flag("rate", "Fixed rate in Mbits/s").Default("0").Uint64()
 	csvFilePrefix = kingpin.Flag("csv-prefix", "File prefix to use for writing the CSV file.").Default("rtt").String()
+	localIAFlag   = kingpin.Flag("local-ia", "ISD-AS address to listen on.").String()
+	remoteIAFlag  = kingpin.Flag("remote-ia", "ISD-AS address to connect to.").String()
+	scionPathFlag = kingpin.Flag("path", "SCION path to use.").String()
 )
 
 var (
@@ -87,14 +78,41 @@ const (
 	MByte = 1000 * KByte
 )
 
+func setAddrIA(s string) (t *addr.IA) {
+	t = &addr.IA{}
+	if s == "" {
+		return
+	}
+
+	if err := t.Set(s); err != nil {
+		log.Debug(fmt.Sprintf("Not setting addrIA to %v\n", s))
+	}
+	return
+}
+
+func setScionPath(s string) (t *scionPathDescription) {
+	t = &scionPathDescription{}
+	if s == "" {
+		return
+	}
+
+	if err := t.Set(s); err != nil {
+		log.Debug(fmt.Sprintf("Not setting scionPath to %v\n", s))
+		log.Error(fmt.Sprintf("Setting scionPath: %v\n", err))
+	}
+	return
+}
+
 func init() {
-	localIAFlag = *IAWrapper(kingpin.Flag("local-ia", "ISD-AS address to listen on."))
-	remoteIAFlag = *IAWrapper(kingpin.Flag("remote-ia", "ISD-AS address to connect to."))
-	scionPath = *ScionPathWrapper(kingpin.Flag("path", "SCION path to use."))
+	setupLogger()
+	kingpin.Parse()
+	localIAFromFlag = *setAddrIA(*localIAFlag)
+	log.Debug(fmt.Sprintf("LocalIA %v\n", localIAFromFlag))
+	remoteIAFromFlag = *setAddrIA(*remoteIAFlag)
+	scionPath = *setScionPath(*scionPathFlag)
 }
 
 func main() {
-	kingpin.Parse()
 	// first run
 	// python3.6 athena_m2.py 2
 	// clear; go run go/flowtele/quic_listener.go --num 3
@@ -112,14 +130,18 @@ func main() {
 	errChannel := make(chan error)
 	closeChannel := make(chan struct{})
 
+	log.Info("Starting...")
 	if *quicSenderOnly || *mode == "quic" {
+		log.Info("QUIC sender\n")
 		invokeQuicSenders(closeChannel, errChannel)
 	} else if *fshaperOnly || *mode == "fshaper" {
+		log.Info("FShaper\n")
 		go func(cc chan struct{}, ec chan error) {
 			defer log.HandlePanic()
 			invokeFshaper(cc, ec)
 		}(closeChannel, errChannel)
 	} else if *mode == "fetch" {
+		log.Info("Fetch\n")
 		go func(cc chan struct{}, ec chan error) {
 			defer log.HandlePanic()
 			invokePathFetching(cc, ec)
@@ -131,17 +153,26 @@ func main() {
 
 	select {
 	case err := <-errChannel:
-		fmt.Fprintf(os.Stderr, "Error encountered (%s), exiting socket\n", err)
+		log.Error(fmt.Sprintf("Error encountered (%s), exiting socket\n", err))
 		os.Exit(1)
 	case <-closeChannel:
-		fmt.Println("Exiting without errors")
+		log.Info("Exiting without errors")
+	}
+}
+
+func setupLogger() {
+	logCfg := log.Config{Console: log.ConsoleConfig{Level: "debug"}}
+	if err := log.Setup(logCfg); err != nil {
+		flag.Usage()
+		fmt.Fprintf(os.Stderr, "Error configuring logger. Exiting due to:%s\n", err)
+		os.Exit(-1)
 	}
 }
 
 func invokePathFetching(closeChannel chan struct{}, errChannel chan error) {
 	sciondAddr := *sciondAddrFlag
-	localIA := localIAFlag
-	remoteIA := remoteIAFlag
+	localIA := localIAFromFlag
+	remoteIA := remoteIAFromFlag
 	paths, err := fetchPaths(sciondAddr, localIA, remoteIA)
 	if err != nil {
 		errChannel <- err
@@ -156,7 +187,7 @@ func invokePathFetching(closeChannel chan struct{}, errChannel chan error) {
 func invokeQuicSenders(closeChannel chan struct{}, errChannel chan error) {
 	// start QUIC instances
 	// TODO(cyrill) read flow specs from config/user_X.json
-	fmt.Printf("Starting %d QUIC senders:\n", *nConnections)
+	log.Info(fmt.Sprintf("Starting %d QUIC senders:\n", *nConnections))
 	remoteIp := net.ParseIP(*remoteIpFlag)
 	localIp := net.ParseIP(*localIpFlag)
 	var wg sync.WaitGroup
@@ -237,6 +268,15 @@ func fetchPaths(sciondAddr string, localIA addr.IA, remoteIA addr.IA) ([]snet.Pa
 	if err != nil {
 		return nil, fmt.Errorf("Unable to initialize SCION network: %s", err)
 	}
+	if localIA.Equal(addr.IA{}) {
+		log.Debug("fetchPaths: Got empty localIA. Fetching from SCIOND now...")
+		localIA, err = sdConn.LocalIA(context.Background())
+		if err != nil {
+			log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
+		}
+	}
+
+	log.Debug(fmt.Sprintf("Remote: %v Local: %v\n", remoteIA, localIA))
 	paths, err := sdConn.Paths(context.Background(), remoteIA, localIA, sd.PathReqFlags{})
 	if err != nil {
 		return nil, fmt.Errorf("Failed to lookup paths: %s", err)
@@ -276,8 +316,8 @@ func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsCo
 		} else {
 			return nil, fmt.Errorf("Must specify either --path or --paths-file and --paths-index")
 		}
-		localIA := localIAFlag
-		remoteIA := remoteIAFlag
+		localIA := localIAFromFlag
+		remoteIA := remoteIAFromFlag
 
 		// fetch path fitting to description
 		var remoteScionAddr snet.UDPAddr
