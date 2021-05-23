@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,7 +40,7 @@ var (
 	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("5500").Int()
 	useRemotePortRange = kingpin.Flag("port-range", "Use increasing (remote) port numbers for additional QUIC senders").Default("false").Bool()
 	localIpFlag        = kingpin.Flag("local-ip", "IP address to listen on (required for SCION)").Default("").String()
-	localPortFlag      = kingpin.Flag("local-port", "Port number to listen on (required for SCION)").Default("0").Int()
+	localPortFlag      = kingpin.Flag("local-port", "Port number to listen on (required for SCION)").Default("51000").Int()
 	useLocalPortRange  = kingpin.Flag("local-port-range", "Use increasing local port numbers for additional QUIC senders").Default("true").Bool()
 	quicSenderOnly     = kingpin.Flag("quic-sender-only", "Only start the quic sender").Default("false").Bool()
 	fshaperOnly        = kingpin.Flag("fshaper-only", "Only start the fshaper").Default("false").Bool()
@@ -86,6 +87,7 @@ func setAddrIA(s string) (t *addr.IA) {
 
 	if err := t.Set(s); err != nil {
 		log.Debug(fmt.Sprintf("Not setting addrIA to %v\n", s))
+		os.Exit(-1)
 	}
 	return
 }
@@ -99,6 +101,7 @@ func setScionPath(s string) (t *scionPathDescription) {
 	if err := t.Set(s); err != nil {
 		log.Debug(fmt.Sprintf("Not setting scionPath to %v\n", s))
 		log.Error(fmt.Sprintf("Setting scionPath: %v\n", err))
+		os.Exit(-1)
 	}
 	return
 }
@@ -177,8 +180,12 @@ func invokePathFetching(closeChannel chan struct{}, errChannel chan error) {
 	if err != nil {
 		errChannel <- err
 	} else {
-		for _, path := range paths {
-			fmt.Println(NewScionPathDescription(path).String())
+		if len(paths) != 0 {
+			for _, path := range paths {
+				fmt.Println(NewScionPathDescription(path).String())
+			}
+		} else {
+			log.Error("Got no paths.")
 		}
 		close(closeChannel)
 	}
@@ -263,17 +270,32 @@ func invokeFshaper(closeChannel chan struct{}, errChannel chan error) {
 	// close(closeChannel)
 }
 
-func fetchPaths(sciondAddr string, localIA addr.IA, remoteIA addr.IA) ([]snet.Path, error) {
-	sdConn, err := sd.NewService(sciondAddr).Connect(context.Background())
+func checkLocalIA(sciondAddr string, localIA addr.IA) (addr.IA, error) {
+	serv := sd.Service{
+		Address: sciondAddr,
+	}
+	sdConn, err := serv.Connect(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("Unable to initialize SCION network: %s", err)
+		return localIA, fmt.Errorf("Unable to initialize SCION network: %s", err)
 	}
 	if localIA.Equal(addr.IA{}) {
 		log.Debug("fetchPaths: Got empty localIA. Fetching from SCIOND now...")
 		localIA, err = sdConn.LocalIA(context.Background())
 		if err != nil {
-			log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
+			return localIA, fmt.Errorf("Error fetching localIA from SCIOND: %v\n", err)
 		}
+	}
+	return localIA, nil
+}
+
+func fetchPaths(sciondAddr string, localIA addr.IA, remoteIA addr.IA) ([]snet.Path, error) {
+	sdConn, err := sd.NewService(sciondAddr).Connect(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("Unable to initialize SCION network: %s", err)
+	}
+	localIA, err = checkLocalIA(sciondAddr, localIA)
+	if err != nil {
+		log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
 	}
 
 	log.Debug(fmt.Sprintf("Remote: %v Local: %v\n", remoteIA, localIA))
@@ -299,6 +321,7 @@ func fetchPath(pathDescription *scionPathDescription, sciondAddr string, localIA
 
 func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsConfig *tls.Config, quicConfig *quic.Config) (quic.Session, error) {
 	if *useScion {
+		log.Debug("Using scion for QUIC session.")
 		dispatcher := *dispatcherFlag
 		sciondAddr := *sciondAddrFlag
 		var pathDescription *scionPathDescription
@@ -316,7 +339,10 @@ func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsCo
 		} else {
 			return nil, fmt.Errorf("Must specify either --path or --paths-file and --paths-index")
 		}
-		localIA := localIAFromFlag
+		localIA, err := checkLocalIA(sciondAddr, localIAFromFlag)
+		if err != nil {
+			log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
+		}
 		remoteIA := remoteIAFromFlag
 
 		// fetch path fitting to description
@@ -334,13 +360,18 @@ func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsCo
 
 		// setup SCION connection
 		ds := reliable.NewDispatcher(dispatcher)
-		sciondConn, err := sd.NewService(sciondAddr).Connect(context.Background())
+		serv := sd.Service{
+			Address: sciondAddr,
+		}
+		sciondConn, err := serv.Connect(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("Unable to initialize SCION network: %s", err)
 		}
+
 		network := snet.NewNetwork(localIA, ds, sd.RevHandler{Connector: sciondConn})
 
 		// start QUIC session
+		log.Debug(fmt.Sprintf("Trying to dial from %v to %v with cfg %v\n", localAddr, remoteAddr, quicConfig))
 		return squic.Dial(network, localAddr, &remoteScionAddr, addr.SvcNone, quicConfig)
 	} else {
 		// open UDP connection
@@ -458,6 +489,12 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 
 	// setup quic session
 	session, err := establishQuicSession(localAddr, remoteAddr, tlsConfig, quicConfig)
+	localIA, err := checkLocalIA(*sciondAddrFlag, addr.IA{})
+	if err != nil {
+		log.Error(fmt.Sprintf("Error receiving localIA: %v\n", err))
+	}
+	dLogger.SetMetadata(append([]string{localIA.String(), localAddr.String()}, strings.Split(session.RemoteAddr().String(), ",")...))
+
 	if err != nil {
 		return fmt.Errorf("Error starting QUIC connection to [%s]: %s", remoteAddr.String(), err)
 	}
