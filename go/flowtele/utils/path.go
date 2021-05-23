@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bufio"
@@ -12,16 +12,16 @@ import (
 	"github.com/scionproto/scion/go/lib/snet"
 )
 
-type scionPathDescription struct {
+type ScionPathDescription struct {
 	IAList []addr.IA
 	IDList []common.IFIDType
 }
 
-func (spd *scionPathDescription) IsEmpty() bool {
+func (spd *ScionPathDescription) IsEmpty() bool {
 	return (spd.IAList == nil && spd.IDList == nil) || len(spd.IAList) == 0 && len(spd.IDList) == 0
 }
 
-func (spd *scionPathDescription) Set(input string) error {
+func (spd *ScionPathDescription) Set(input string) error {
 	if input == "" {
 		spd.IAList = make([]addr.IA, 0)
 		spd.IDList = make([]common.IFIDType, 0)
@@ -73,7 +73,7 @@ func (spd *scionPathDescription) Set(input string) error {
 	return nil
 }
 
-func (spd *scionPathDescription) String() string {
+func (spd *ScionPathDescription) String() string {
 	if len(spd.IAList) < 2 {
 		return "<Empty SCION path description>"
 	}
@@ -93,7 +93,7 @@ func (spd *scionPathDescription) String() string {
 	return sb.String()
 }
 
-func (spd *scionPathDescription) IsEqual(other *scionPathDescription) bool {
+func (spd *ScionPathDescription) IsEqual(other *ScionPathDescription) bool {
 	if len(spd.IAList) != len(other.IAList) {
 		return false
 	}
@@ -105,8 +105,8 @@ func (spd *scionPathDescription) IsEqual(other *scionPathDescription) bool {
 	return true
 }
 
-func NewScionPathDescription(p snet.Path) *scionPathDescription {
-	var spd scionPathDescription
+func NewScionPathDescription(p snet.Path) *ScionPathDescription {
+	var spd ScionPathDescription
 	spd.IAList = make([]addr.IA, len(p.Metadata().Interfaces))
 	spd.IDList = make([]common.IFIDType, len(p.Metadata().Interfaces))
 	for i, ifs := range p.Metadata().Interfaces {
@@ -116,16 +116,16 @@ func NewScionPathDescription(p snet.Path) *scionPathDescription {
 	return &spd
 }
 
-func readPaths(pathsFile string) ([]*scionPathDescription, error) {
+func ReadPaths(pathsFile string) ([]*ScionPathDescription, error) {
 	f, err := os.Open(pathsFile)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	spds := make([]*scionPathDescription, 0)
+	spds := make([]*ScionPathDescription, 0)
 	for scanner.Scan() {
-		var spd scionPathDescription
+		var spd ScionPathDescription
 		spd.Set(scanner.Text())
 		spds = append(spds, &spd)
 	}

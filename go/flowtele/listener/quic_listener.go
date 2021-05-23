@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"flag"
 	"fmt"
+	"github.com/scionproto/scion/go/flowtele/utils"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"io"
 	"net"
@@ -20,19 +20,11 @@ import (
 	"github.com/scionproto/scion/go/lib/log"
 	sd "github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
-	"github.com/scionproto/scion/go/lib/snet/squic"
-	"github.com/scionproto/scion/go/lib/sock/reliable"
 )
 
 const (
 	errorNoError quic.ErrorCode = 0x100
 )
-
-func IAWrapper(s kingpin.Settings) (target *addr.IA) {
-	target = &addr.IA{}
-	s.SetValue(target)
-	return
-}
 
 var (
 	tlsConfig       tls.Config
@@ -57,24 +49,10 @@ var (
 	done = make(chan struct{}, 1)
 )
 
-func setAddrIA(s string) (t *addr.IA) {
-	t = &addr.IA{}
-	if s == "" {
-		return
-	}
-
-	if err := t.Set(s); err != nil {
-		log.Debug(fmt.Sprintf("Not setting addrIA to %v\n", s))
-		os.Exit(-1)
-	}
-	return
-}
-
 func init() {
-	setupLogger()
+	utils.SetupLogger()
 	kingpin.Parse()
-	localIAFromFlag = *setAddrIA(*localIAFlag)
-	log.Debug(fmt.Sprintf("LocalIA %v\n", localIAFromFlag))
+	localIAFromFlag = *utils.SetAddrIA(*localIAFlag)
 }
 
 // create certificate and key with
@@ -93,23 +71,11 @@ func initTlsCert() error {
 func getQuicListener(lAddr *net.UDPAddr) (quic.Listener, error) {
 	quicConfig := &quic.Config{MaxIdleTimeout: time.Hour}
 	if *useScion {
-		dispatcher := *dispatcherFlag
-		sciondAddr := *sciondAddrFlag
-		localIA := localIAFromFlag
-		ds := reliable.NewDispatcher(dispatcher)
-		serv := sd.Service{
-			Address: sciondAddr,
-		}
-		sciondConn, err := serv.Connect(context.Background())
+		localIA, err := utils.CheckLocalIA(*sciondAddrFlag, localIAFromFlag)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to initialize SCION network (%s)", err)
+			log.Error("Error receiving localIA from SCIOND.")
 		}
-		network := snet.NewNetwork(localIA, ds, sd.RevHandler{Connector: sciondConn})
-		if err = squic.Init(*keyPath, *pemPath); err != nil {
-			return nil, fmt.Errorf("Unable to load TLS server certificates: %s", err)
-		}
-		log.Debug(fmt.Sprintf("Listening on %v to with cfg %v\n", lAddr, quicConfig))
-		return squic.Listen(network, lAddr, addr.SvcNone, quicConfig)
+		return utils.GetScionQuicListener(*dispatcherFlag, *sciondAddrFlag, lAddr, localIA, keyPath, pemPath, quicConfig)
 	} else {
 		conn, err := net.ListenUDP("udp", lAddr)
 		if err != nil {
@@ -291,14 +257,5 @@ func main() {
 		os.Exit(1)
 	case <-closeChannel:
 		log.Info("Exiting without errors")
-	}
-}
-
-func setupLogger() {
-	logCfg := log.Config{Console: log.ConsoleConfig{Level: "debug"}}
-	if err := log.Setup(logCfg); err != nil {
-		flag.Usage()
-		fmt.Fprintf(os.Stderr, "Error configuring logger. Exiting due to:%s\n", err)
-		os.Exit(-1)
 	}
 }
