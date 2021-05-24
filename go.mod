@@ -41,9 +41,7 @@ require (
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.20.1+incompatible
-	github.com/uber/jaeger-lib v2.0.0+incompatible // indirect
 	github.com/vishvananda/netlink v0.0.0-20170924180554-177f1ceba557
-	github.com/vishvananda/netns v0.0.0-20170219233438-54f0e4339ce7 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/goleak v1.1.10
 	go.uber.org/zap v1.17.0
@@ -62,6 +60,11 @@ replace github.com/nxadm/tail => github.com/lukedirtwalker/tail v1.3.1-0.2019091
 
 replace github.com/smartystreets/goconvey => github.com/kormat/goconvey v0.0.0-20191113114839-63cc4eee0dbc
 
-replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-flowtele
+replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-2-flowtele
+
+replace github.com/netsec-ethz/scion-apps v0.3.0 => github.com/tcinbis/scion-apps v0.3.2
+
+//replace github.com/lucas-clemente/quic-go => ../quic-go
+//replace github.com/netsec-ethz/scion-apps => ../scion-apps
 
 go 1.14
