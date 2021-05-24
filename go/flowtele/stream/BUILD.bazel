@@ -1,0 +1,28 @@
+load("//lint:go.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("//:scion.bzl", "scion_go_binary")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["server.go"],
+    importpath = "github.com/scionproto/scion/go/flowtele/stream",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_lucas_clemente_quic_go//:go_default_library",
+        "@com_github_lucas_clemente_quic_go//flowtele:go_default_library",
+        "@com_github_netsec_ethz_scion_apps//pkg/shttp:go_default_library",
+        "@in_gopkg_alecthomas_kingpin_v2//:go_default_library",
+    ],
+)
+
+scion_go_binary(
+    name = "flowtele_stream",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "stream",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
