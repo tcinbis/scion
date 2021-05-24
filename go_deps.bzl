@@ -1233,6 +1233,13 @@ def go_deps():
         version = "v0.2.0",
     )
     go_repository(
+        name = "com_github_netsec_ethz_scion_apps",
+        importpath = "github.com/netsec-ethz/scion-apps",
+        replace = "github.com/tcinbis/scion-apps",
+        sum = "h1:LQwMQsMBfV6seZC2gCNuO1GrEbgEG7y7UPy9KS09Y8U=",
+        version = "v0.3.2",
+    )
+    go_repository(
         name = "com_github_niemeyer_pretty",
         importpath = "github.com/niemeyer/pretty",
         sum = "h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=",

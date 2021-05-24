@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	//dataDir = "/home/tom/go/src/scion/go/flowtele/stream/data/"
 	dataDir = "go/src/scion/go/flowtele/stream/data/"
 	Bit     = 1
 	KBit    = 1000 * Bit
