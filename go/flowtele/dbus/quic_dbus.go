@@ -40,20 +40,22 @@ func (qdbmi quicDbusMethodInterface) ApplyControl(dType uint32, beta float64, cw
 type QuicDbus struct {
 	DbusBase
 	FlowId             int32
+	peer               string
 	Session            quic.FlowTeleSession
 	lastLogTime        map[QuicDbusSignalType]time.Time
 	logMessagesSkipped map[QuicDbusSignalType]uint64
 	applyControl       bool
 }
 
-func NewQuicDbus(flowId int32, applyControl bool) *QuicDbus {
+func NewQuicDbus(flowId int32, applyControl bool, peer string) *QuicDbus {
 	var d QuicDbus
 	d.Init()
 	d.FlowId = flowId
+	d.peer = peer
 	d.applyControl = applyControl
-	d.ServiceName = getQuicServiceName(flowId)
-	d.ObjectPath = getQuicObjectPath(flowId)
-	d.InterfaceName = getQuicInterfaceName(flowId)
+	d.ServiceName = getQuicServiceName(flowId, peer)
+	d.ObjectPath = getQuicObjectPath(flowId, peer)
+	d.InterfaceName = getQuicInterfaceName(flowId, peer)
 	d.LogPrefix = fmt.Sprintf("QUIC_%d", d.FlowId)
 	d.ExportedMethods = quicDbusMethodInterface{quicDbus: &d}
 	d.SignalMatchOptions = []dbus.MatchOption{}
@@ -120,14 +122,14 @@ func (qdb *QuicDbus) SendCwndSignal(t time.Time, cwnd uint32, pktsInFlight int32
 	return qdb.Send(CreateQuicDbusSignalCwnd(qdb.FlowId, t, cwnd, pktsInFlight, ackedBytes))
 }
 
-func getQuicServiceName(flowId int32) string {
-	return fmt.Sprintf("%s_%d", QUIC_SERVICE_NAME, flowId)
+func getQuicServiceName(flowId int32, peer string) string {
+	return fmt.Sprintf("%s_%s_%d", QUIC_SERVICE_NAME, peer, flowId)
 }
 
-func getQuicObjectPath(flowId int32) dbus.ObjectPath {
-	return dbus.ObjectPath(fmt.Sprintf("%s_%d", QUIC_OBJECT_PATH, flowId))
+func getQuicObjectPath(flowId int32, peer string) dbus.ObjectPath {
+	return dbus.ObjectPath(fmt.Sprintf("%s_%s_%d", QUIC_OBJECT_PATH, peer, flowId))
 }
 
-func getQuicInterfaceName(flowId int32) string {
-	return fmt.Sprintf("%s_%d", QUIC_SERVICE_NAME, flowId)
+func getQuicInterfaceName(flowId int32, peer string) string {
+	return fmt.Sprintf("%s_%s_%d", QUIC_SERVICE_NAME, peer, flowId)
 }
