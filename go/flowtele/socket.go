@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -327,9 +328,13 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		close(done)
 	}()
 
+	cleanForFileSystem := regexp.MustCompile("[:.]")
 	// setup datalogger
 	dLogger := datalogger.NewDbusDataLogger(
-		fmt.Sprintf("%s-samples-%d.csv", *csvFilePrefix, time.Now().Unix()), []string{"flowID", "microTimestamp", "microSRTT"},
+		fmt.Sprintf(
+			"%s-samples-%d-%s.csv", *csvFilePrefix, time.Now().Unix(), cleanForFileSystem.ReplaceAllString(remoteAddr.String(), ""),
+		),
+		[]string{"flowID", "microTimestamp", "microSRTT"},
 		[]string{"localIA", "src", "dest"},
 	)
 	defer dLogger.Close()
@@ -337,7 +342,7 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	dLogger.Run()
 
 	// start dbus
-	peerString := strings.ReplaceAll(strings.ReplaceAll(remoteAddr.String(), ".", ""), ":", "")
+	peerString := cleanForFileSystem.ReplaceAllString(remoteAddr.String(), "")
 	qdbus := flowteledbus.NewQuicDbus(flowId, applyControl, peerString)
 	qdbus.SetMinIntervalForAllSignals(5 * time.Millisecond)
 	if err := qdbus.OpenSessionBus(); err != nil {
@@ -359,10 +364,10 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		if srtt > math.MaxUint32 {
 			panic("srtt does not fit in uint32")
 		}
-		signal := flowteledbus.CreateQuicDbusSignalRtt(flowId, t, uint32(srtt.Microseconds()))
+		dbusSignal := flowteledbus.CreateQuicDbusSignalRtt(flowId, t, uint32(srtt.Microseconds()))
 		dLogger.Send(&datalogger.RTTData{FlowID: int(flowId), Timestamp: t, SRtt: srtt})
-		if qdbus.ShouldSendSignal(signal) {
-			if err := qdbus.Send(signal); err != nil {
+		if qdbus.ShouldSendSignal(dbusSignal) {
+			if err := qdbus.Send(dbusSignal); err != nil {
 				fmt.Printf("srtt -> %d\n", qdbus.FlowId)
 				errChannel <- err
 			}
@@ -378,9 +383,9 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		if newSlowStartThreshold > math.MaxUint32 {
 			panic("newSlotStartThreshold does not fit in uint32")
 		}
-		signal := flowteledbus.CreateQuicDbusSignalLost(flowId, t, uint32(newSlowStartThreshold))
-		if qdbus.ShouldSendSignal(signal) {
-			if err := qdbus.Send(signal); err != nil {
+		dbusSignal := flowteledbus.CreateQuicDbusSignalLost(flowId, t, uint32(newSlowStartThreshold))
+		if qdbus.ShouldSendSignal(dbusSignal) {
+			if err := qdbus.Send(dbusSignal); err != nil {
 				fmt.Printf("lost -> %d\n", qdbus.FlowId)
 				errChannel <- err
 			}
@@ -402,9 +407,9 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 			panic("ackedBytes does not fit in uint32")
 		}
 		ackedBytesSum := qdbus.Acked(uint32(ackedBytes))
-		signal := flowteledbus.CreateQuicDbusSignalCwnd(flowId, t, uint32(congestionWindow), int32(packetsInFlight), ackedBytesSum)
-		if qdbus.ShouldSendSignal(signal) {
-			if err := qdbus.Send(signal); err != nil {
+		dbusSignal := flowteledbus.CreateQuicDbusSignalCwnd(flowId, t, uint32(congestionWindow), int32(packetsInFlight), ackedBytesSum)
+		if qdbus.ShouldSendSignal(dbusSignal) {
+			if err := qdbus.Send(dbusSignal); err != nil {
 				fmt.Printf("ack -> %d\n", qdbus.FlowId)
 				errChannel <- err
 			}

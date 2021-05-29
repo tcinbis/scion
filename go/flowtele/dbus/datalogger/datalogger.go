@@ -24,6 +24,7 @@ type RTTData struct {
 
 type DbusDataLogger struct {
 	writerChan chan channelData
+	abortChan  chan struct{}
 	csvFile    *os.File
 	writer     *csv.Writer
 	metaData   []string
@@ -35,6 +36,7 @@ func NewDbusDataLogger(csvFileName string, csvHeader []string, metaDataHeader []
 	check(err)
 	d := DbusDataLogger{
 		writerChan: make(chan channelData, 100),
+		abortChan:  make(chan struct{}, 1),
 		csvFile:    file,
 		header:     append(csvHeader, metaDataHeader...),
 	}
@@ -58,21 +60,39 @@ func (d *DbusDataLogger) SendString(data []string) {
 
 func (d *DbusDataLogger) writeHeader() {
 	check(d.writer.Write(d.header))
+	check(d.writer.Error())
 }
 
 func (d *DbusDataLogger) Close() {
 	close(d.writerChan)
-	d.writer.Flush()
-	check(d.csvFile.Close())
+	close(d.abortChan)
 }
 
 func (d *DbusDataLogger) Run() {
 	go func() {
 		defer log.HandlePanic()
-		for s := range d.writerChan {
-			check(d.writer.Write(append(s, d.metaData...)))
+		defer func() {
+			fmt.Println("### Closing csvFile ###")
+			check(d.csvFile.Close())
+			check(d.writer.Error())
+		}()
+	loop:
+		for {
+			select {
+			case <-d.abortChan:
+				fmt.Println("CSV Writer received abort. Flushing file")
+				d.writer.Flush()
+				check(d.writer.Error())
+				fmt.Printf("%d left in writter channel\n", len(d.writerChan))
+				break loop
+			case s := <-d.writerChan:
+				if len(s) > 0 {
+					check(d.writer.Write(append(s, d.metaData...)))
+					check(d.writer.Error())
+				}
+			}
 		}
-		d.writer.Flush()
+		fmt.Println("### Exiting datalogger run function ###")
 	}()
 }
 
