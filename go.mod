@@ -33,6 +33,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.1-0.20180815053127-5633e0862627+incompatible
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
+	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.6.0
 	github.com/sergi/go-diff v1.0.1-0.20180205163309-da645544ed44
 	github.com/smartystreets/goconvey v1.6.4
@@ -60,7 +61,7 @@ replace github.com/nxadm/tail => github.com/lukedirtwalker/tail v1.3.1-0.2019091
 
 replace github.com/smartystreets/goconvey => github.com/kormat/goconvey v0.0.0-20191113114839-63cc4eee0dbc
 
-replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-2-flowtele
+replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-3-flowtele
 
 replace github.com/netsec-ethz/scion-apps v0.3.0 => github.com/tcinbis/scion-apps v0.3.2
 
