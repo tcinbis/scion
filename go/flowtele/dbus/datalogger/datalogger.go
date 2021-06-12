@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/scionproto/scion/go/lib/log"
@@ -29,9 +30,10 @@ type DbusDataLogger struct {
 	writer     *csv.Writer
 	metaData   []string
 	header     []string
+	wg         *sync.WaitGroup
 }
 
-func NewDbusDataLogger(csvFileName string, csvHeader []string, metaDataHeader []string) *DbusDataLogger {
+func NewDbusDataLogger(csvFileName string, csvHeader []string, metaDataHeader []string, waitGroup *sync.WaitGroup) *DbusDataLogger {
 	file, err := os.Create(csvFileName)
 	check(err)
 	d := DbusDataLogger{
@@ -39,6 +41,7 @@ func NewDbusDataLogger(csvFileName string, csvHeader []string, metaDataHeader []
 		abortChan:  make(chan struct{}, 1),
 		csvFile:    file,
 		header:     append(csvHeader, metaDataHeader...),
+		wg:         waitGroup,
 	}
 	d.writer = csv.NewWriter(d.csvFile)
 	d.writeHeader()
@@ -69,18 +72,25 @@ func (d *DbusDataLogger) Close() {
 }
 
 func (d *DbusDataLogger) Run() {
+	d.wg.Add(1)
 	go func() {
 		defer log.HandlePanic()
 		defer func() {
 			fmt.Println("### Closing csvFile ###")
 			check(d.csvFile.Close())
 			check(d.writer.Error())
+			d.wg.Done()
 		}()
+		i := 1
 	loop:
 		for {
 			select {
 			case <-d.abortChan:
 				fmt.Println("CSV Writer received abort. Flushing file")
+				for s := range d.writerChan {
+					check(d.writer.Write(append(s, d.metaData...)))
+					check(d.writer.Error())
+				}
 				d.writer.Flush()
 				check(d.writer.Error())
 				fmt.Printf("%d left in writter channel\n", len(d.writerChan))
@@ -88,6 +98,12 @@ func (d *DbusDataLogger) Run() {
 			case s := <-d.writerChan:
 				if len(s) > 0 {
 					check(d.writer.Write(append(s, d.metaData...)))
+					check(d.writer.Error())
+					i++
+				}
+
+				if i%500 == 0 {
+					d.writer.Flush()
 					check(d.writer.Error())
 				}
 			}
@@ -107,5 +123,6 @@ func UnixMicroseconds(t time.Time) int64 {
 func check(err error) {
 	if err != nil {
 		fmt.Printf("Error in dbus datalogger: %v\n", err)
+		panic(err)
 	}
 }

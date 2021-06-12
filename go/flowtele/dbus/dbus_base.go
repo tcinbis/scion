@@ -20,16 +20,19 @@ type DbusBase struct {
 	SignalMatchOptions []dbus.MatchOption
 	ExportedSignals    []introspect.Signal
 
-	SignalMinInterval map[QuicDbusSignalType]time.Duration
-	lastSignalSent    map[QuicDbusSignalType]time.Time
+	SignalMinInterval   map[QuicDbusSignalType]time.Duration
+	lastSignalSent      map[QuicDbusSignalType]time.Time
+	lastSignalSentMutex sync.Mutex
 
 	ackedBytesMutex sync.Mutex
 	ackedBytes      uint32
 
-	LogSignals           bool
-	SignalLogMinInterval map[QuicDbusSignalType]time.Duration
-	lastSignalLogged     map[QuicDbusSignalType]time.Time
-	logMessagesSkipped   map[QuicDbusSignalType]uint64
+	LogSignals              bool
+	SignalLogMinInterval    map[QuicDbusSignalType]time.Duration
+	lastSignalLogged        map[QuicDbusSignalType]time.Time
+	lastSignalLoggedMutex   sync.Mutex
+	logMessagesSkipped      map[QuicDbusSignalType]uint64
+	logMessagesSkippedMutex sync.Mutex
 
 	LogPrefix string
 }
@@ -86,10 +89,14 @@ func (db *DbusBase) ShouldSendSignal(s DbusSignal) bool {
 		// no min interval is set
 		return true
 	}
+	db.lastSignalSentMutex.Lock()
 	lastSignalTime, ok := db.lastSignalSent[t]
+	db.lastSignalSentMutex.Unlock()
 	now := time.Now()
 	if !ok || now.Sub(lastSignalTime) > interval {
+		db.lastSignalSentMutex.Lock()
 		db.lastSignalSent[t] = now
+		db.lastSignalSentMutex.Unlock()
 		return true
 	} else {
 		return false
@@ -105,21 +112,29 @@ func (db *DbusBase) Send(s DbusSignal) error {
 			// no min interval is set
 			logSignal = true
 		} else {
+			db.lastSignalLoggedMutex.Lock()
 			lastSignalLogTime, ok := db.lastSignalLogged[t]
+			db.lastSignalLoggedMutex.Unlock()
 			now := time.Now()
 			if !ok || now.Sub(lastSignalLogTime) > interval {
+				db.lastSignalLoggedMutex.Lock()
 				db.lastSignalLogged[t] = now
+				db.lastSignalLoggedMutex.Unlock()
 				logSignal = true
 			} else {
 				// skip this log message and increase skipped counter
+				db.logMessagesSkippedMutex.Lock()
 				db.logMessagesSkipped[t] += 1
+				db.logMessagesSkippedMutex.Unlock()
 			}
 		}
 		if logSignal {
 			nSkipped := uint64(0)
+			db.logMessagesSkippedMutex.Lock()
 			if val2, ok2 := db.logMessagesSkipped[t]; ok2 {
 				nSkipped = val2
 			}
+			db.logMessagesSkippedMutex.Unlock()
 			switch t {
 			case Rtt:
 				db.Log("RTT (skipped %d) srtt = %.5fms", nSkipped, float32(s.Values()[3].(uint32))/1000)
@@ -128,7 +143,9 @@ func (db *DbusBase) Send(s DbusSignal) error {
 			case Cwnd:
 				db.Log("Cwnd (skipped %d) cwnd = %d, inflight = %d, acked = %d", nSkipped, s.Values()[3], s.Values()[4], s.Values()[5])
 			}
+			db.logMessagesSkippedMutex.Lock()
 			db.logMessagesSkipped[t] = 0
+			db.logMessagesSkippedMutex.Unlock()
 		}
 	}
 	return db.Conn.Emit(db.ObjectPath, db.InterfaceName+"."+s.Name(), s.Values()...)
