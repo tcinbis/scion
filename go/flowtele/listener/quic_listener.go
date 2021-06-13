@@ -254,7 +254,7 @@ func main() {
 	select {
 	case err := <-errs:
 		log.Error(fmt.Sprintf("Error encountered (%s), stopping all listeners\n", err))
-		os.Exit(1)
+		return
 	case <-closeChannel:
 		log.Info("Exiting without errors")
 	}

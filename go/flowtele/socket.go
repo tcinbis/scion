@@ -38,7 +38,7 @@ var (
 	scionPath                         utils.ScionPathDescription
 
 	remoteIpFlag       = kingpin.Flag("ip", "IP address to connect to").Default("127.0.0.1").String()
-	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("5500").Int()
+	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("51000").Int()
 	useRemotePortRange = kingpin.Flag("port-range", "Use increasing (remote) port numbers for additional QUIC senders").Default("false").Bool()
 	localIpFlag        = kingpin.Flag("local-ip", "IP address to listen on (required for SCION)").Default("").String()
 	localPortFlag      = kingpin.Flag("local-port", "Port number to listen on (required for SCION)").Default("51000").Int()
@@ -63,6 +63,7 @@ var (
 	remoteIAFlag  = kingpin.Flag("remote-ia", "ISD-AS address to connect to.").String()
 	scionPathFlag = kingpin.Flag("path", "SCION path to use.").String()
 	profiling     = kingpin.Flag("profiling", "").Default("false").Bool()
+	target        = kingpin.Flag("target", "Convenience flag to interpret joint IP and/or IA addresses. Example: 1.1.1.1 or 16-ffaa:0:1002,1.1.1.1").Default("").String()
 )
 
 var (
@@ -87,6 +88,38 @@ func init() {
 	kingpin.Parse()
 	localIAFromFlag = *utils.SetAddrIA(*localIAFlag)
 	log.Debug(fmt.Sprintf("LocalIA %v\n", localIAFromFlag))
+
+	if len(*target) > 0 {
+		log.Info(*target)
+		if strings.Contains(*target, "/") {
+			// systemd-escape weirdly escapes a - so we have to fix it here
+			*target = strings.ReplaceAll(*target, "/", "-")
+		}
+		log.Info(*target)
+		x := strings.Split(*target, ",")
+		log.Debug(fmt.Sprintf("target split into: %v\n", x))
+		if *useScion {
+			// we have to parse IP and IA from target
+			if len(x) != 2 {
+				log.Error(fmt.Sprintf("Expected target to be separable by comma, but got %v from %v\n", x, *target))
+				os.Exit(-1)
+			}
+			*remoteIAFlag = x[0]
+			*remoteIpFlag = x[1]
+		} else {
+			// only parse IP from target
+			if len(x) == 1 {
+				*remoteIpFlag = x[0]
+			} else if len(x) == 2 {
+				*remoteIpFlag = x[1]
+			} else {
+				log.Error(fmt.Sprintf("Expected target to be single IP, but got %v from %v\n", x, *target))
+				os.Exit(-1)
+			}
+
+		}
+	}
+
 	remoteIAFromFlag = *utils.SetAddrIA(*remoteIAFlag)
 	scionPath = *utils.SetScionPath(*scionPathFlag)
 }
@@ -414,8 +447,8 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 			panic("srtt does not fit in uint32")
 		}
 		dbusSignal := flowteledbus.CreateQuicDbusSignalRtt(flowId, t, uint32(srtt.Microseconds()))
+		dLogger.Send(&datalogger.RTTData{FlowID: int(flowId), Timestamp: t, SRtt: srtt})
 		if qdbus.ShouldSendSignal(dbusSignal) {
-			dLogger.Send(&datalogger.RTTData{FlowID: int(flowId), Timestamp: t, SRtt: srtt})
 			if err := qdbus.Send(dbusSignal); err != nil {
 				fmt.Printf("srtt -> %d\n", qdbus.FlowId)
 				errChannel <- err
