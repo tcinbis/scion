@@ -2,7 +2,7 @@
 USER=$(id -un)
 REMOTE_USER=$USER
 REPO_PATH=$(dirname "$(readlink -f "$0")")
-HOSTS="flowtele-ohio flowtele-singapore" # flowtele-ethz"
+HOSTS="flowtele-ohio flowtele-singapore flowtele-ethz"
 
 if [ ! "$(command -v prsync)" ]; then
     echo "Please install parallel rsync"

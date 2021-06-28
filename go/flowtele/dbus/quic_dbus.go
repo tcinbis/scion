@@ -40,11 +40,13 @@ func (qdbmi quicDbusMethodInterface) ApplyControl(dType uint32, beta float64, cw
 type QuicDbus struct {
 	DbusBase
 	FlowId             int32
-	peer               string
 	Session            quic.FlowTeleSession
 	lastLogTime        map[QuicDbusSignalType]time.Time
 	logMessagesSkipped map[QuicDbusSignalType]uint64
 	applyControl       bool
+
+	// peer identifies a quic session communicating with another machine which is identified by this string. Can be an IP/port or SCION address
+	peer string
 }
 
 func NewQuicDbus(flowId int32, applyControl bool, peer string) *QuicDbus {
@@ -131,5 +133,5 @@ func getQuicObjectPath(flowId int32, peer string) dbus.ObjectPath {
 }
 
 func getQuicInterfaceName(flowId int32, peer string) string {
-	return fmt.Sprintf("%s_%s_%d", QUIC_SERVICE_NAME, peer, flowId)
+	return fmt.Sprintf("%s_%s_%d", QUIC_INTERFACE_NAME, peer, flowId)
 }

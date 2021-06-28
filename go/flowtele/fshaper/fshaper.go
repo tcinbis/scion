@@ -1,32 +1,19 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/pkg/profile"
-	"github.com/scionproto/scion/go/flowtele/utils"
-	"math"
-	"net"
-	"os"
-	"os/signal"
-	"regexp"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
-
-	"github.com/scionproto/scion/go/flowtele/dbus/datalogger"
-
 	"github.com/lucas-clemente/quic-go"
-	"github.com/lucas-clemente/quic-go/flowtele"
+	"github.com/pkg/profile"
 	"github.com/scionproto/scion/go/flowtele/dbus"
+	"github.com/scionproto/scion/go/flowtele/utils"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/log"
-	sd "github.com/scionproto/scion/go/lib/sciond"
-	"github.com/scionproto/scion/go/lib/snet"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"net"
+	"os"
+	"strings"
+	"sync"
 )
 
 const (
@@ -34,8 +21,7 @@ const (
 )
 
 var (
-	localIAFromFlag, remoteIAFromFlag addr.IA
-	scionPath                         utils.ScionPathDescription
+	localIAFromFlag addr.IA
 
 	remoteIpFlag       = kingpin.Flag("ip", "IP address to connect to").Default("127.0.0.1").String()
 	remotePortFlag     = kingpin.Flag("port", "Port number to connect to").Default("51000").Int()
@@ -48,22 +34,14 @@ var (
 	quicDbusIndex      = kingpin.Flag("quic-dbus-index", "index of the quic sender dbus name").Default("0").Int()
 	nConnections       = kingpin.Flag("num", "Number of QUIC connections").Default("2").Int()
 	noApplyControl     = kingpin.Flag("no-apply-control", "Do not forward apply-control calls from fshaper to this QUIC connection (useful to ensure the calibrator flow is not influenced by vAlloc)").Default("false").Bool()
-	mode               = kingpin.Flag("mode", "the sockets mode of operation: fetch, quic, fshaper").Default("fetch").String()
+	mode               = kingpin.Flag("mode", "the sockets mode of operation: fetch, quic, fshaper").Default("fshaper").String()
 	maxData            = kingpin.Flag("max-data", "the maximum amount of data that should be transmitted on each QUIC flow (0 means no limit)").Default("0").Int()
 
-	useScion        = kingpin.Flag("scion", "Open scion quic sockets").Default("false").Bool()
-	dispatcherFlag  = kingpin.Flag("dispatcher", "Path to dispatcher socket").Default("").String()
-	sciondAddrFlag  = kingpin.Flag("sciond", "SCIOND address").Default(sd.DefaultAPIAddress).String()
-	scionPathsFile  = kingpin.Flag("paths-file", "File containing a list of SCION paths to the destination").Default("").String()
-	scionPathsIndex = kingpin.Flag("paths-index", "Index of the path to use in the --paths-file").Default("0").Int()
-
-	rate          = kingpin.Flag("rate", "Fixed rate in Mbits/s").Default("0").Uint64()
-	csvFilePrefix = kingpin.Flag("csv-prefix", "File prefix to use for writing the CSV file.").Default("rtt").String()
-	localIAFlag   = kingpin.Flag("local-ia", "ISD-AS address to listen on.").String()
-	remoteIAFlag  = kingpin.Flag("remote-ia", "ISD-AS address to connect to.").String()
-	scionPathFlag = kingpin.Flag("path", "SCION path to use.").String()
-	profiling     = kingpin.Flag("profiling", "").Default("false").Bool()
-	target        = kingpin.Flag("target", "Convenience flag to interpret joint IP and/or IA addresses. Example: 1.1.1.1 or 16-ffaa:0:1002,1.1.1.1").Default("").String()
+	useScion     = kingpin.Flag("scion", "Open scion quic sockets").Default("false").Bool()
+	localIAFlag  = kingpin.Flag("local-ia", "ISD-AS address to listen on.").String()
+	remoteIAFlag = kingpin.Flag("remote-ia", "ISD-AS address to connect to.").String()
+	profiling    = kingpin.Flag("profiling", "").Default("false").Bool()
+	target       = kingpin.Flag("target", "Convenience flag to interpret joint IP and/or IA addresses. Example: 1.1.1.1 or 16-ffaa:0:1002,1.1.1.1").Default("").String()
 )
 
 var (
@@ -119,9 +97,6 @@ func init() {
 
 		}
 	}
-
-	remoteIAFromFlag = *utils.SetAddrIA(*remoteIAFlag)
-	scionPath = *utils.SetScionPath(*scionPathFlag)
 }
 
 func main() {
@@ -146,25 +121,15 @@ func main() {
 		defer p.Stop()
 	}
 	log.Info("Starting...")
-	if *quicSenderOnly || *mode == "quic" {
-		log.Info("QUIC sender\n")
-		invokeQuicSenders(closeChannel, errChannel)
-	} else if *fshaperOnly || *mode == "fshaper" {
+	if *fshaperOnly || *mode == "fshaper" {
 		log.Info("FShaper\n")
-		panic("Not implemented fshaper yet.")
-		//go func(cc chan struct{}, ec chan error) {
-		//	defer log.HandlePanic()
-		//	invokeFshaper(cc, ec)
-		//}(closeChannel, errChannel)
-	} else if *mode == "fetch" {
-		log.Info("Fetch\n")
 		go func(cc chan struct{}, ec chan error) {
 			defer log.HandlePanic()
-			invokePathFetching(cc, ec)
+			invokeFshaper(cc, ec)
 		}(closeChannel, errChannel)
 	} else {
 		flag.PrintDefaults()
-		errChannel <- fmt.Errorf("Must provide either --quic-sender-only or --fshaper-only")
+		errChannel <- fmt.Errorf("Must provide --fshaper-only")
 	}
 
 	select {
@@ -179,445 +144,46 @@ func main() {
 	}
 }
 
-func invokePathFetching(closeChannel chan struct{}, errChannel chan error) {
-	sciondAddr := *sciondAddrFlag
-	localIA := localIAFromFlag
-	remoteIA := remoteIAFromFlag
-	paths, err := fetchPaths(sciondAddr, localIA, remoteIA)
-	if err != nil {
+func invokeFshaper(closeChannel chan struct{}, errChannel chan error) {
+	remoteAddr := net.UDPAddr{IP: net.ParseIP(*remoteIpFlag), Port: *remotePortFlag}
+	peerString := utils.CleanStringForFS(remoteAddr.String())
+	fdbus := flowteledbus.NewFshaperDbus(*nConnections, peerString)
+
+	// if a min interval for the fshaper is specified, make sure to accumulate acked bytes that would otherwise not be registered by athena
+	// fdbus.SetMinIntervalForAllSignals(5 * time.Millisecond)
+
+	// dbus setup
+	if err := fdbus.OpenSessionBus(); err != nil {
 		errChannel <- err
-	} else {
-		if len(paths) != 0 {
-			for _, path := range paths {
-				fmt.Println(utils.NewScionPathDescription(path).String())
-			}
-		} else {
-			log.Error("Got no paths.")
-		}
-		close(closeChannel)
+		return
 	}
-}
 
-func invokeQuicSenders(closeChannel chan struct{}, errChannel chan error) {
-	// start QUIC instances
-	// TODO(cyrill) read flow specs from config/user_X.json
-	log.Info(fmt.Sprintf("Starting %d QUIC senders:\n", *nConnections))
-	remoteIp := net.ParseIP(*remoteIpFlag)
-	localIp := net.ParseIP(*localIpFlag)
-	var wg sync.WaitGroup
-	for i := 0; i < *nConnections; i++ {
-		wg.Add(1)
-		go func(index int) {
-			defer log.HandlePanic()
-			defer wg.Done()
-			localPort := *localPortFlag
-			remotePort := *remotePortFlag
-
-			if *useLocalPortRange {
-				localPort += index
-			}
-			if *useRemotePortRange {
-				remotePort += index
-			}
-
-			localAddr := net.UDPAddr{IP: localIp, Port: localPort}
-			remoteAddr := net.UDPAddr{IP: remoteIp, Port: remotePort}
-			err := startQuicSender(&localAddr, &remoteAddr, int32(*quicDbusIndex+index), !*noApplyControl, errChannel)
-			if err != nil {
-				errChannel <- err
-			}
-		}(i)
+	// register method and listeners
+	if err := fdbus.Register(); err != nil {
+		errChannel <- err
+		return
 	}
+
+	// listen for feedback from QUIC instances and forward to athena
 	go func() {
 		defer log.HandlePanic()
-		wg.Wait()
-		close(closeChannel)
-	}()
-}
-
-//func invokeFshaper(closeChannel chan struct{}, errChannel chan error) {
-//	fdbus := flowteledbus.NewFshaperDbus(*nConnections)
-//
-//	// if a min interval for the fshaper is specified, make sure to accumulate acked bytes that would otherwise not be registered by athena
-//	// fdbus.SetMinIntervalForAllSignals(5 * time.Millisecond)
-//
-//	// dbus setup
-//	if err := fdbus.OpenSessionBus(); err != nil {
-//		errChannel <- err
-//		return
-//	}
-//
-//	// register method and listeners
-//	if err := fdbus.Register(); err != nil {
-//		errChannel <- err
-//		return
-//	}
-//
-//	// listen for feedback from QUIC instances and forward to athena
-//	go func() {
-//		defer log.HandlePanic()
-//		for v := range fdbus.SignalListener {
-//			if fdbus.Conn.Names()[0] == v.Sender {
-//				// fdbus.Log("ignore signal %s generated by socket", v.Name)
-//			} else {
-//				// fdbus.Log("forwarding signal...")
-//				signal := flowteledbus.CreateFshaperDbusSignal(v)
-//				if fdbus.ShouldSendSignal(signal) {
-//					if err := fdbus.Send(signal); err != nil {
-//						errChannel <- err
-//						return
-//					}
-//				}
-//			}
-//		}
-//	}()
-//
-//	// don't close the closeChannel to keep running forever
-//	// fdbus.Close()
-//	// close(closeChannel)
-//}
-
-func fetchPaths(sciondAddr string, localIA addr.IA, remoteIA addr.IA) ([]snet.Path, error) {
-	sdConn, err := utils.GetSciondService(sciondAddr).Connect(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("Unable to initialize SCION network: %s", err)
-	}
-	localIA, err = utils.CheckLocalIA(sciondAddr, localIA)
-	if err != nil {
-		log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
-	}
-
-	log.Debug(fmt.Sprintf("Remote: %v Local: %v\n", remoteIA, localIA))
-	paths, err := sdConn.Paths(context.Background(), remoteIA, localIA, sd.PathReqFlags{})
-	if err != nil {
-		return nil, fmt.Errorf("Failed to lookup paths: %s", err)
-	}
-	return paths, nil
-}
-
-func fetchPath(pathDescription *utils.ScionPathDescription, sciondAddr string, localIA addr.IA, remoteIA addr.IA) (snet.Path, error) {
-	paths, err := fetchPaths(sciondAddr, localIA, remoteIA)
-	if err != nil {
-		return nil, err
-	}
-	for _, path := range paths {
-		if pathDescription.IsEqual(utils.NewScionPathDescription(path)) {
-			return path, nil
-		}
-	}
-	return nil, fmt.Errorf("No matching path (%v) was found in %v", pathDescription, paths)
-}
-
-func establishQuicSession(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, tlsConfig *tls.Config, quicConfig *quic.Config) (quic.Session, error) {
-	if *useScion {
-		localIA, err := utils.CheckLocalIA(*sciondAddrFlag, localIAFromFlag)
-		if err != nil {
-			log.Error(fmt.Sprintf("Error fetching localIA from SCIOND: %v\n", err))
-		}
-		remoteIA := remoteIAFromFlag
-
-		log.Debug("Using scion for QUIC session.")
-		var pathDescription *utils.ScionPathDescription
-		if !scionPath.IsEmpty() {
-			pathDescription = &scionPath
-		} else if *scionPathsFile != "" {
-			pathDescriptions, err := utils.ReadPaths(*scionPathsFile)
-			if err != nil {
-				return nil, fmt.Errorf("Couldn't read paths from file %s: %s", *scionPathsFile, err)
-			}
-			if *scionPathsIndex >= len(pathDescriptions) {
-				return nil, fmt.Errorf("SCION path index out of range %d >= %d", *scionPathsIndex, len(pathDescriptions))
-			}
-			pathDescription = pathDescriptions[*scionPathsIndex]
-		} else {
-			log.Info("Did not specify --path or --paths-file and --paths-index! Choosing dynamically...")
-			paths, err := fetchPaths(*sciondAddrFlag, localIA, remoteIA)
-			if err != nil || len(paths) < 1 {
-				return nil, fmt.Errorf("error fetching paths dynamically")
-			}
-			pathDescription = utils.NewScionPathDescription(paths[0])
-			log.Info(fmt.Sprintf("Using path: %s\n", pathDescription.String()))
-		}
-
-		// fetch path fitting to description
-		var remoteScionAddr snet.UDPAddr
-		remoteScionAddr.Host = remoteAddr
-		remoteScionAddr.IA = remoteIA
-		if !remoteIA.Equal(localIA) {
-			path, err := fetchPath(pathDescription, *sciondAddrFlag, localIA, remoteIA)
-			if err != nil {
-				return nil, err
-			}
-			remoteScionAddr.Path = path.Path()
-			remoteScionAddr.NextHop = path.UnderlayNextHop()
-		}
-		return utils.GetScionQuicSession(*dispatcherFlag, *sciondAddrFlag, localAddr, remoteScionAddr, localIA, quicConfig)
-	} else {
-		// open UDP connection
-		// localAddr := net.UDPAddr{IP: net.IPv4zero, Port: 0}
-		//conn, err := net.ListenUDP("udp", localAddr)
-		//if err != nil {
-		//	fmt.Printf("Error starting UDP listener: %s\n", err)
-		//	return nil, err
-		//}
-
-		// start QUIC session
-		//return quic.Dial(conn, remoteAddr, "host:0", tlsConfig, quicConfig)
-		log.Info(fmt.Sprintf("Dialing quic addr: %s\n", remoteAddr.String()))
-		return quic.DialAddr(remoteAddr.String(), tlsConfig, quicConfig)
-	}
-}
-
-//type bufferedWriteCloser struct {
-//	*bufio.Writer
-//	io.Closer
-//}
-//
-//// NewBufferedWriteCloser creates an io.WriteCloser from a bufio.Writer and an io.Closer
-//func NewBufferedWriteCloser(writer *bufio.Writer, closer io.Closer) io.WriteCloser {
-//	return &bufferedWriteCloser{
-//		Writer: writer,
-//		Closer: closer,
-//	}
-//}
-//
-//func (h bufferedWriteCloser) Close() error {
-//	if err := h.Writer.Flush(); err != nil {
-//		return err
-//	}
-//	return h.Closer.Close()
-//}
-
-func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int32, applyControl bool, errChannel chan error) error {
-	// capture interrupts to gracefully terminate run
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		defer log.HandlePanic()
-		sig := <-sigs
-		fmt.Printf("%v\n", sig)
-		close(done)
-	}()
-
-	cleanForFileSystem := regexp.MustCompile("[:.]")
-	// setup datalogger
-	log.Info(fmt.Sprintf("Configuring data logger now..."))
-
-	var metadataHeader []string
-	if *useScion {
-		metadataHeader = []string{"localIA", "src", "dest"}
-	} else {
-		metadataHeader = []string{"src", "dest"}
-	}
-
-	dLogger := datalogger.NewDbusDataLogger(
-		fmt.Sprintf(
-			"%s-samples-%d-%s.csv", *csvFilePrefix, time.Now().Unix(), cleanForFileSystem.ReplaceAllString(remoteAddr.String(), ""),
-		),
-		[]string{"flowID", "microTimestamp", "microSRTT"},
-		metadataHeader,
-		&loggerWait,
-	)
-	defer dLogger.Close()
-	dLogger.SetMetadata([]string{localAddr.String(), remoteAddr.String()})
-	dLogger.Run()
-	log.Info(fmt.Sprintf("Data logger complete"))
-
-	// start dbus
-	log.Info(fmt.Sprintf("Starting DBUS"))
-	peerString := cleanForFileSystem.ReplaceAllString(remoteAddr.String(), "")
-	qdbus := flowteledbus.NewQuicDbus(flowId, applyControl, peerString)
-	qdbus.SetMinIntervalForAllSignals(5 * time.Millisecond)
-	if err := qdbus.OpenSessionBus(); err != nil {
-		return err
-	}
-	defer qdbus.Close()
-
-	if err := qdbus.Register(); err != nil {
-		return err
-	}
-
-	// signal forwarding functions
-	newSrttMeasurement := func(t time.Time, srtt time.Duration) {
-		if qdbus.Conn == nil {
-			// ignore signals if the session bus is not connected
-			return
-		}
-
-		if srtt > math.MaxUint32 {
-			panic("srtt does not fit in uint32")
-		}
-		dbusSignal := flowteledbus.CreateQuicDbusSignalRtt(flowId, t, uint32(srtt.Microseconds()))
-		dLogger.Send(&datalogger.RTTData{FlowID: int(flowId), Timestamp: t, SRtt: srtt})
-		if qdbus.ShouldSendSignal(dbusSignal) {
-			if err := qdbus.Send(dbusSignal); err != nil {
-				fmt.Printf("srtt -> %d\n", qdbus.FlowId)
-				errChannel <- err
-			}
-		}
-	}
-
-	packetsLost := func(t time.Time, newSlowStartThreshold uint64) {
-		if qdbus.Conn == nil {
-			// ignore signals if the session bus is not connected
-			return
-		}
-
-		if newSlowStartThreshold > math.MaxUint32 {
-			panic("newSlotStartThreshold does not fit in uint32")
-		}
-		dbusSignal := flowteledbus.CreateQuicDbusSignalLost(flowId, t, uint32(newSlowStartThreshold))
-		if qdbus.ShouldSendSignal(dbusSignal) {
-			if err := qdbus.Send(dbusSignal); err != nil {
-				fmt.Printf("lost -> %d\n", qdbus.FlowId)
-				errChannel <- err
-			}
-		}
-	}
-	packetsAcked := func(t time.Time, congestionWindow uint64, packetsInFlight uint64, ackedBytes uint64) {
-		if qdbus.Conn == nil {
-			// ignore signals if the session bus is not connected
-			return
-		}
-
-		if congestionWindow > math.MaxUint32 {
-			panic("congestionWindow does not fit in uint32")
-		}
-		if packetsInFlight > math.MaxInt32 {
-			panic("packetsInFlight does not fit in int32")
-		}
-		if ackedBytes > math.MaxUint32 {
-			panic("ackedBytes does not fit in uint32")
-		}
-		ackedBytesSum := qdbus.Acked(uint32(ackedBytes))
-		dbusSignal := flowteledbus.CreateQuicDbusSignalCwnd(flowId, t, uint32(congestionWindow), int32(packetsInFlight), ackedBytesSum)
-		if qdbus.ShouldSendSignal(dbusSignal) {
-			if err := qdbus.Send(dbusSignal); err != nil {
-				fmt.Printf("ack -> %d\n", qdbus.FlowId)
-				errChannel <- err
-			}
-			qdbus.ResetAcked()
-		}
-	}
-	log.Info(fmt.Sprintf("Configuring QUIC"))
-	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(newSrttMeasurement, packetsLost, packetsAcked)
-	//tracer := qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
-	//	filename := fmt.Sprintf("client_%x.qlog", connID)
-	//	f, err := os.Create(filename)
-	//	if err != nil {
-	//		log.Error(fmt.Sprintf("Tracer error: %v\n", err))
-	//	}
-	//	log.Info(fmt.Sprintf("Creating qlog file %s.\n", filename))
-	//	return NewBufferedWriteCloser(bufio.NewWriter(f), f)
-	//})
-	// make QUIC idle timout long to allow a delay between starting the listeners and the senders
-	//quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
-	//	FlowTeleSignal: flowteleSignalInterface, Tracer: tracer}
-	quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
-		FlowTeleSignal: flowteleSignalInterface}
-	tlsConfig := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"Flowtele"}}
-
-	if *useScion {
-		localIA, err := utils.CheckLocalIA(*sciondAddrFlag, addr.IA{})
-		if err != nil {
-			log.Error(fmt.Sprintf("Error receiving localIA: %v\n", err))
-		}
-		dLogger.SetMetadata(append([]string{localIA.String(), localAddr.String()}, strings.Split(remoteAddr.String(), ",")...))
-	} else {
-		dLogger.SetMetadata(append([]string{localAddr.String()}, strings.Split(remoteAddr.String(), ",")...))
-	}
-
-	log.Info(fmt.Sprintf("Establishing quic session"))
-	session, err := establishQuicSession(localAddr, remoteAddr, tlsConfig, quicConfig)
-	if err != nil {
-		return fmt.Errorf("Error starting QUIC connection to [%s]: %s", remoteAddr.String(), err)
-	}
-	defer func() {
-		fmt.Printf("closing session %d\n", flowId)
-		// session.Close()
-		qdbus.Session = nil
-	}()
-	log.Info(fmt.Sprintf("Session established."))
-	qdbus.Session = checkFlowTeleSession(session)
-	// open stream
-	//rateInBitsPerSecond := uint64(20 * 1000 * 1000)
-	//session.SetFixedRate(rateInBitsPerSecond)
-	//qdbus.Log("set fixed rate %f...", float64(rateInBitsPerSecond)/1000000)
-	qdbus.Log("session established. Opening stream...")
-	ctx, cancelStream := context.WithCancel(context.Background())
-	go func() {
-		defer log.HandlePanic()
-	loop:
-		for {
-			select {
-			case <-done:
-				cancelStream()
-				if err := session.CloseWithError(errorNoError, "Interrupt received."); err != nil {
-					fmt.Printf("Error closing session: %v\n", err)
-				}
-				break loop
-			}
-		}
-	}()
-	stream, err := session.OpenStreamSync(ctx)
-	if err != nil {
-		return fmt.Errorf("Error opening QUIC stream to [%s]: %s", remoteAddr.String(), err)
-	}
-	defer func() {
-		fmt.Println("closing stream")
-		if err := stream.Close(); err != nil {
-			fmt.Printf("Deffered Error closing stream: %v\n", err)
-		}
-	}()
-	qdbus.Log("stream opened %d", stream.StreamID())
-	// continuously send 10MB messages to quic listener
-	message := make([]byte, 10000000)
-	for i := range message {
-		message[i] = 42
-	}
-
-	if *rate > 0 {
-		qdbus.Log("Setting rate to %d Mbit/s", *rate)
-		checkFlowTeleSession(qdbus.Session).SetFixedRate(*rate * MBit)
-	}
-
-	sentBytes := 0
-
-loop:
-	for {
-		select {
-		case <-done:
-			break loop
-		default:
-			if *maxData == 0 {
-				_, err = stream.Write(message)
+		for v := range fdbus.SignalListener {
+			if fdbus.Conn.Names()[0] == v.Sender {
+				fdbus.Log("ignore signal %s generated by socket", v.Name)
 			} else {
-				if sentBytes < *maxData {
-					var n int
-					n, err = stream.Write(message[0:min(len(message), *maxData-sentBytes)])
-					sentBytes += n
-				} else {
-					break
+				fdbus.Log("forwarding signal %s ...", v.Name)
+				signal := flowteledbus.CreateFshaperDbusSignal(v)
+				if fdbus.ShouldSendSignal(signal) {
+					if err := fdbus.Send(signal); err != nil {
+						errChannel <- err
+						return
+					}
 				}
 			}
-			if err != nil {
-				return fmt.Errorf("Error writing message to [%s]: %s", remoteAddr.String(), err)
-			}
 		}
-	}
-	return nil
-}
+	}()
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func checkFlowTeleSession(s quic.Session) quic.FlowTeleSession {
-	fs, ok := s.(quic.FlowTeleSession)
-	if !ok {
-		panic("Returned session is not flowtele sessions")
-	}
-	return fs
+	// don't close the closeChannel to keep running forever
+	// fdbus.Close()
+	// close(closeChannel)
 }

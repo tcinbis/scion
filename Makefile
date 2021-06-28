@@ -24,10 +24,10 @@ bazel:
 	tar -kxf bazel-bin/scion-ci.tar -C bin
 
 flowtele:
-	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\* go/flowtele/stream:\*
+	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\* go/flowtele/stream:\* go/flowtele/fshaper:\*
 
 flowtele-debug:
-	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\* go/flowtele/stream:\* --sandbox_debug
+	 bazel build go/flowtele:\* go/flowtele/listener:\* go/flowtele/dbus:\* go/flowtele/stream:\* go/flowtele/fshaper:\* --sandbox_debug
 
 test:
 	bazel test --config=unit --test_output=errors

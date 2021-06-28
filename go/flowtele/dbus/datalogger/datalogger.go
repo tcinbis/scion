@@ -23,6 +23,12 @@ type RTTData struct {
 	SRtt      time.Duration
 }
 
+type CwndData struct {
+	FlowID    int
+	Timestamp time.Time
+	Cwnd      uint64
+}
+
 type DbusDataLogger struct {
 	writerChan chan channelData
 	abortChan  chan struct{}
@@ -114,6 +120,10 @@ func (d *DbusDataLogger) Run() {
 
 func (r *RTTData) Strings() []string {
 	return []string{strconv.Itoa(r.FlowID), strconv.Itoa(int(UnixMicroseconds(r.Timestamp))), strconv.Itoa(int(r.SRtt.Microseconds()))}
+}
+
+func (c *CwndData) Strings() []string {
+	return []string{strconv.Itoa(c.FlowID), strconv.Itoa(int(UnixMicroseconds(c.Timestamp))), strconv.FormatUint(c.Cwnd, 10)}
 }
 
 func UnixMicroseconds(t time.Time) int64 {
