@@ -91,11 +91,8 @@ type Connector interface {
 	// service types is returned. The reply is a map from service type to URI of
 	// the service.
 	SVCInfo(ctx context.Context, svcTypes []addr.HostSVC) (map[addr.HostSVC]string, error)
-	// RevNotification sends a raw revocation to SCIOND, as contained in an
-	// SCMP message.
-	RevNotificationFromRaw(ctx context.Context, b []byte) error
 	// RevNotification sends a RevocationInfo message to SCIOND.
-	RevNotification(ctx context.Context, sRevInfo *path_mgmt.SignedRevInfo) error
+	RevNotification(ctx context.Context, sRevInfo *path_mgmt.RevInfo) error
 	// DRKeyGetLvl2Key sends a DRKey Lvl2Key request to SCIOND
 	DRKeyGetLvl2Key(ctx context.Context, meta drkey.Lvl2Meta,
 		valTime time.Time) (drkey.Lvl2Key, error)
