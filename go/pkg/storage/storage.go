@@ -61,9 +61,6 @@ var (
 	SamplePathDB = DBConfig{
 		Connection: DefaultPathDBPath,
 	}
-	SampleRenewalDB = DBConfig{
-		Connection: "/share/data/trustdb/%s.renewal.db",
-	}
 	SampleTrustDB = DBConfig{
 		Connection: DefaultTrustDBPath,
 	}
