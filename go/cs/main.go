@@ -61,7 +61,6 @@ import (
 	"github.com/scionproto/scion/go/lib/scrypto/cppki"
 	"github.com/scionproto/scion/go/lib/serrors"
 	"github.com/scionproto/scion/go/lib/snet"
-	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/pkg/api/jwtauth"
 	"github.com/scionproto/scion/go/pkg/app/launcher"
@@ -130,6 +129,12 @@ func realMain() error {
 		Driver: string(storage.BackendSqlite),
 	})
 	defer pathDB.Close()
+
+	macGen, err := cs.MACGenFactory(globalCfg.General.ConfigDir)
+	if err != nil {
+		return err
+	}
+
 	nc := infraenv.NetworkConfig{
 		IA:                    topo.IA(),
 		Public:                topo.PublicAddress(addr.SvcCS, globalCfg.General.ID),
@@ -152,8 +157,11 @@ func realMain() error {
 		return serrors.WrapStr("initializing TCP stack", err)
 	}
 	dialer := &libgrpc.QUICDialer{
-		Rewriter: nc.AddressRewriter(nil),
-		Dialer:   quicStack.Dialer,
+		Rewriter: &onehop.AddressRewriter{
+			Rewriter: nc.AddressRewriter(nil),
+			MAC:      macGen(),
+		},
+		Dialer: quicStack.Dialer,
 	}
 
 	trustDB, err := storage.NewTrustStorage(globalCfg.TrustDB)
@@ -603,27 +611,10 @@ func realMain() error {
 	if err != nil {
 		return serrors.WrapStr("registering status pages", err)
 	}
-	ohpConn, err := cs.NewOneHopConn(topo.IA(), nc.Public, "",
-		globalCfg.General.ReconnectToDispatcher)
-	if err != nil {
-		return serrors.WrapStr("creating one-hop connection", err)
-	}
-	macGen, err := cs.MACGenFactory(globalCfg.General.ConfigDir)
-	if err != nil {
-		return err
-	}
 	staticInfo, err := beaconing.ParseStaticInfoCfg(globalCfg.General.StaticInfoConfig())
 	if err != nil {
 		log.Info("No static info file found. Static info settings disabled.", "err", err)
 	}
-
-	addressRewriter := nc.AddressRewriter(
-		&onehop.OHPPacketDispatcherService{
-			PacketDispatcherService: &snet.DefaultPacketDispatcherService{
-				Dispatcher: reliable.NewDispatcher(""),
-			},
-		},
-	)
 
 	var propagationFilter func(intf *ifstate.Interface) bool
 	if topo.Core() {
@@ -656,22 +647,12 @@ func realMain() error {
 		TrustDB:  trustDB,
 		PathDB:   pathDB,
 		RevCache: revCache,
-		BeaconSender: &onehop.BeaconSender{
-			Sender: onehop.Sender{
-				Conn: ohpConn,
-				IA:   topo.IA(),
-				MAC:  macGen(),
-				Addr: nc.Public,
-			},
-			AddressRewriter: addressRewriter,
-			RPC: beaconinggrpc.BeaconSender{
-				Dialer: dialer,
-			},
+		BeaconSenderFactory: &beaconinggrpc.BeaconSenderFactory{
+			Dialer: dialer,
 		},
 		SegmentRegister: beaconinggrpc.Registrar{Dialer: dialer},
 		BeaconStore:     beaconStore,
 		Signer:          signer,
-		OneHopConn:      ohpConn,
 		Inspector:       inspector,
 		Metrics:         metrics,
 		DRKeyStore:      drkeyServStore,
