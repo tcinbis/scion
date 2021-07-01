@@ -5,7 +5,6 @@ proto_library(
     srcs = [
         "cppki.proto",
         "drkey.proto",
-        "legacy.proto",
         "renewal.proto",
         "seg.proto",
         "seg_extensions.proto",

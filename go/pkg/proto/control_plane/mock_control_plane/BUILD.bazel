@@ -6,8 +6,6 @@ gomock(
     out = "mock.go",
     interfaces = [
         "ChainRenewalServiceServer",
-        "InterfaceStateConsumerServiceServer",
-        "InterfaceStateServiceServer",
         "TrustMaterialServiceServer",
         "DRKeyLvl2ServiceServer",
         "DRKeyLvl1ServiceServer",
