@@ -45,7 +45,7 @@ func NewHost(host addr.HostAddr) Host {
 
 // ToHostAddr returns the host as a addr.HostAddr.
 func (h *Host) ToHostAddr() addr.HostAddr {
-	host, err := addr.HostFromRaw(h.Host, addr.HostAddrType(h.Type))
+	host, err := addr.HostFromRaw(h.Host, h.Type)
 	if err != nil {
 		panic("Could not convert addr.HostAddr to drkey.Host")
 	}

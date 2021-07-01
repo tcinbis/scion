@@ -25,7 +25,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"net"
 	"time"
@@ -132,8 +131,7 @@ func (nc *NetworkConfig) QUICStack() (*QUICStack, error) {
 		return nil, serrors.WrapStr("listening TLS/QUIC/SCION", err)
 	}
 
-	cancel, err := nc.initSvcRedirect(fmt.Sprintf("%s", server.LocalAddr()),
-		fmt.Sprintf("%s", tlsServer.LocalAddr()))
+	cancel, err := nc.initSvcRedirect(server.LocalAddr().String(), tlsServer.LocalAddr().String())
 	if err != nil {
 		return nil, serrors.WrapStr("starting service redirection", err)
 	}

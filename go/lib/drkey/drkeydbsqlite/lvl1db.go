@@ -92,6 +92,7 @@ func (b *Lvl1Backend) GetLvl1SrcASes(ctx context.Context) ([]addr.IA, error) {
 		}
 		return nil, err
 	}
+	defer rows.Close()
 	ases := []addr.IA{}
 	for rows.Next() {
 		var I, A int
@@ -103,6 +104,9 @@ func (b *Lvl1Backend) GetLvl1SrcASes(ctx context.Context) ([]addr.IA, error) {
 			A: addr.AS(A),
 		}
 		ases = append(ases, ia)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return ases, nil
 }
@@ -123,6 +127,7 @@ func (b *Lvl1Backend) GetValidLvl1SrcASes(ctx context.Context, valTime uint32) (
 		}
 		return nil, err
 	}
+	defer rows.Close()
 	ases := []addr.IA{}
 	for rows.Next() {
 		var I, A int
@@ -134,6 +139,9 @@ func (b *Lvl1Backend) GetValidLvl1SrcASes(ctx context.Context, valTime uint32) (
 			A: addr.AS(A),
 		}
 		ases = append(ases, ia)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return ases, nil
 }

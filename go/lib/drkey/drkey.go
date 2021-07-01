@@ -25,5 +25,5 @@ func (k DRKey) String() string {
 
 // Equal returns true if both DRKeys are identical
 func (k DRKey) Equal(other DRKey) bool {
-	return bytes.Compare(k, other) == 0
+	return bytes.Equal(k, other)
 }

@@ -211,7 +211,7 @@ func (t *TasksConfig) extender(task string, ia addr.IA, mtu uint16,
 		MAC:        t.MACGen,
 		Intfs:      t.AllInterfaces,
 		MTU:        mtu,
-		MaxExpTime: func() uint8 { return uint8(maxExp()) },
+		MaxExpTime: func() uint8 { return maxExp() },
 		StaticInfo: t.StaticInfo,
 		Task:       task,
 		EPIC:       false,
@@ -251,8 +251,8 @@ type Tasks struct {
 	Registrars      []*periodic.Runner
 	DRKeyPrefetcher *periodic.Runner
 
-	PathCleaner *periodic.Runner
-	DRKeyCleaner  *periodic.Runner
+	PathCleaner  *periodic.Runner
+	DRKeyCleaner *periodic.Runner
 }
 
 func StartTasks(cfg TasksConfig) (*Tasks, error) {
@@ -260,9 +260,9 @@ func StartTasks(cfg TasksConfig) (*Tasks, error) {
 	segCleaner := pathdb.NewCleaner(cfg.PathDB, "control_pathstorage_segments")
 	segRevCleaner := revcache.NewCleaner(cfg.RevCache, "control_pathstorage_revocation")
 	return &Tasks{
-		Originator: cfg.Originator(),
-		Propagator: cfg.Propagator(),
-		Registrars: cfg.SegmentWriters(),
+		Originator:      cfg.Originator(),
+		Propagator:      cfg.Propagator(),
+		Registrars:      cfg.SegmentWriters(),
 		DRKeyPrefetcher: cfg.DRKeyPrefetcher(),
 		PathCleaner: periodic.Start(
 			periodic.Func{

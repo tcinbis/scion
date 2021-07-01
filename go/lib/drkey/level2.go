@@ -56,7 +56,7 @@ type Lvl2Key struct {
 
 // Equal returns true if both level 2 keys are identical.
 func (k Lvl2Key) Equal(other Lvl2Key) bool {
-	return k.Lvl2Meta.Equal(other.Lvl2Meta) && bytes.Compare(k.Key, other.Key) == 0
+	return k.Lvl2Meta.Equal(other.Lvl2Meta) && bytes.Equal(k.Key, other.Key)
 }
 
 // DelegationSecret is similar to a level 2 key, type AS to AS.

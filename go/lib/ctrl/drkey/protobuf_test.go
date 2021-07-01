@@ -93,7 +93,7 @@ func TestKeyToLvl1Resp(t *testing.T) {
 	targetResp := &dkpb.DRKeyLvl1Response{
 		EpochBegin: epochBegin,
 		EpochEnd:   epochEnd,
-		Drkey:      []byte(k),
+		Drkey:      k,
 	}
 
 	pbResp, err := ctrl.KeyToLvl1Resp(lvl1Key)
@@ -115,7 +115,7 @@ func TestGetLvl1KeyFromReply(t *testing.T) {
 	resp := &dkpb.DRKeyLvl1Response{
 		EpochBegin: epochBegin,
 		EpochEnd:   epochEnd,
-		Drkey:      []byte(k),
+		Drkey:      k,
 	}
 
 	targetLvl1Key := drkey.Lvl1Key{
@@ -151,11 +151,11 @@ func TestRequestToLvl2Req(t *testing.T) {
 		ValTime:  valTime,
 		SrcHost: &dkpb.DRKeyLvl2Request_DRKeyHost{
 			Type: uint32(hostType),
-			Host: []byte(hostAddr.Pack()),
+			Host: hostAddr.Pack(),
 		},
 		DstHost: &dkpb.DRKeyLvl2Request_DRKeyHost{
 			Type: uint32(hostType),
-			Host: []byte(hostAddr.Pack()),
+			Host: hostAddr.Pack(),
 		},
 	}
 
@@ -167,11 +167,11 @@ func TestRequestToLvl2Req(t *testing.T) {
 		DstIA:    dstIA,
 		SrcHost: ctrl.Host{
 			Type: hostType,
-			Host: []byte(hostAddr.Pack()),
+			Host: hostAddr.Pack(),
 		},
 		DstHost: ctrl.Host{
 			Type: hostType,
-			Host: []byte(hostAddr.Pack()),
+			Host: hostAddr.Pack(),
 		},
 	}
 

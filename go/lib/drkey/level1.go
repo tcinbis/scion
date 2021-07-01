@@ -40,5 +40,5 @@ type Lvl1Key struct {
 
 // Equal returns true if both level 1 keys are identical.
 func (k Lvl1Key) Equal(other Lvl1Key) bool {
-	return k.Lvl1Meta.Equal(other.Lvl1Meta) && bytes.Compare(k.Key, other.Key) == 0
+	return k.Lvl1Meta.Equal(other.Lvl1Meta) && bytes.Equal(k.Key, other.Key)
 }

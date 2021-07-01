@@ -59,7 +59,10 @@ func (b *dbBaseBackend) prepareAll(stmts preparedStmts) error {
 		}
 	}()
 	for str, stmt := range stmts {
-		if *stmt, err = b.db.Prepare(str); err != nil {
+		// FIXME(matzf): the sqlclosecheck linter does not like this pattern.
+		// Perhapse this should be refactored to just avoid the prepared statements;
+		// this does not appear to be goroutine safe anyway.
+		if *stmt, err = b.db.Prepare(str); err != nil { // nolint:sqlclosecheck
 			return serrors.WrapStr(unableToPrepareStmt, err)
 		}
 	}

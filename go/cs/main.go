@@ -629,8 +629,7 @@ func realMain() error {
 		}
 	}
 
-	var originationFilter func(intf *ifstate.Interface) bool
-	originationFilter = func(intf *ifstate.Interface) bool {
+	originationFilter := func(intf *ifstate.Interface) bool {
 		topoInfo := intf.TopoInfo()
 		return topoInfo.LinkType == topology.Core || topoInfo.LinkType == topology.Child
 	}
