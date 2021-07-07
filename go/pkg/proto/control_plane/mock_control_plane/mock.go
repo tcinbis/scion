@@ -6,36 +6,37 @@ package mock_control_plane
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	control_plane "github.com/scionproto/scion/go/pkg/proto/control_plane"
 	drkey "github.com/scionproto/scion/go/pkg/proto/drkey"
-	reflect "reflect"
 )
 
-// MockChainRenewalServiceServer is a mock of ChainRenewalServiceServer interface
+// MockChainRenewalServiceServer is a mock of ChainRenewalServiceServer interface.
 type MockChainRenewalServiceServer struct {
 	ctrl     *gomock.Controller
 	recorder *MockChainRenewalServiceServerMockRecorder
 }
 
-// MockChainRenewalServiceServerMockRecorder is the mock recorder for MockChainRenewalServiceServer
+// MockChainRenewalServiceServerMockRecorder is the mock recorder for MockChainRenewalServiceServer.
 type MockChainRenewalServiceServerMockRecorder struct {
 	mock *MockChainRenewalServiceServer
 }
 
-// NewMockChainRenewalServiceServer creates a new mock instance
+// NewMockChainRenewalServiceServer creates a new mock instance.
 func NewMockChainRenewalServiceServer(ctrl *gomock.Controller) *MockChainRenewalServiceServer {
 	mock := &MockChainRenewalServiceServer{ctrl: ctrl}
 	mock.recorder = &MockChainRenewalServiceServerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockChainRenewalServiceServer) EXPECT() *MockChainRenewalServiceServerMockRecorder {
 	return m.recorder
 }
 
-// ChainRenewal mocks base method
+// ChainRenewal mocks base method.
 func (m *MockChainRenewalServiceServer) ChainRenewal(arg0 context.Context, arg1 *control_plane.ChainRenewalRequest) (*control_plane.ChainRenewalResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ChainRenewal", arg0, arg1)
@@ -44,36 +45,36 @@ func (m *MockChainRenewalServiceServer) ChainRenewal(arg0 context.Context, arg1 
 	return ret0, ret1
 }
 
-// ChainRenewal indicates an expected call of ChainRenewal
+// ChainRenewal indicates an expected call of ChainRenewal.
 func (mr *MockChainRenewalServiceServerMockRecorder) ChainRenewal(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainRenewal", reflect.TypeOf((*MockChainRenewalServiceServer)(nil).ChainRenewal), arg0, arg1)
 }
 
-// MockTrustMaterialServiceServer is a mock of TrustMaterialServiceServer interface
+// MockTrustMaterialServiceServer is a mock of TrustMaterialServiceServer interface.
 type MockTrustMaterialServiceServer struct {
 	ctrl     *gomock.Controller
 	recorder *MockTrustMaterialServiceServerMockRecorder
 }
 
-// MockTrustMaterialServiceServerMockRecorder is the mock recorder for MockTrustMaterialServiceServer
+// MockTrustMaterialServiceServerMockRecorder is the mock recorder for MockTrustMaterialServiceServer.
 type MockTrustMaterialServiceServerMockRecorder struct {
 	mock *MockTrustMaterialServiceServer
 }
 
-// NewMockTrustMaterialServiceServer creates a new mock instance
+// NewMockTrustMaterialServiceServer creates a new mock instance.
 func NewMockTrustMaterialServiceServer(ctrl *gomock.Controller) *MockTrustMaterialServiceServer {
 	mock := &MockTrustMaterialServiceServer{ctrl: ctrl}
 	mock.recorder = &MockTrustMaterialServiceServerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockTrustMaterialServiceServer) EXPECT() *MockTrustMaterialServiceServerMockRecorder {
 	return m.recorder
 }
 
-// Chains mocks base method
+// Chains mocks base method.
 func (m *MockTrustMaterialServiceServer) Chains(arg0 context.Context, arg1 *control_plane.ChainsRequest) (*control_plane.ChainsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Chains", arg0, arg1)
@@ -82,13 +83,13 @@ func (m *MockTrustMaterialServiceServer) Chains(arg0 context.Context, arg1 *cont
 	return ret0, ret1
 }
 
-// Chains indicates an expected call of Chains
+// Chains indicates an expected call of Chains.
 func (mr *MockTrustMaterialServiceServerMockRecorder) Chains(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chains", reflect.TypeOf((*MockTrustMaterialServiceServer)(nil).Chains), arg0, arg1)
 }
 
-// TRC mocks base method
+// TRC mocks base method.
 func (m *MockTrustMaterialServiceServer) TRC(arg0 context.Context, arg1 *control_plane.TRCRequest) (*control_plane.TRCResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TRC", arg0, arg1)
@@ -97,36 +98,36 @@ func (m *MockTrustMaterialServiceServer) TRC(arg0 context.Context, arg1 *control
 	return ret0, ret1
 }
 
-// TRC indicates an expected call of TRC
+// TRC indicates an expected call of TRC.
 func (mr *MockTrustMaterialServiceServerMockRecorder) TRC(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TRC", reflect.TypeOf((*MockTrustMaterialServiceServer)(nil).TRC), arg0, arg1)
 }
 
-// MockDRKeyLvl2ServiceServer is a mock of DRKeyLvl2ServiceServer interface
+// MockDRKeyLvl2ServiceServer is a mock of DRKeyLvl2ServiceServer interface.
 type MockDRKeyLvl2ServiceServer struct {
 	ctrl     *gomock.Controller
 	recorder *MockDRKeyLvl2ServiceServerMockRecorder
 }
 
-// MockDRKeyLvl2ServiceServerMockRecorder is the mock recorder for MockDRKeyLvl2ServiceServer
+// MockDRKeyLvl2ServiceServerMockRecorder is the mock recorder for MockDRKeyLvl2ServiceServer.
 type MockDRKeyLvl2ServiceServerMockRecorder struct {
 	mock *MockDRKeyLvl2ServiceServer
 }
 
-// NewMockDRKeyLvl2ServiceServer creates a new mock instance
+// NewMockDRKeyLvl2ServiceServer creates a new mock instance.
 func NewMockDRKeyLvl2ServiceServer(ctrl *gomock.Controller) *MockDRKeyLvl2ServiceServer {
 	mock := &MockDRKeyLvl2ServiceServer{ctrl: ctrl}
 	mock.recorder = &MockDRKeyLvl2ServiceServerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDRKeyLvl2ServiceServer) EXPECT() *MockDRKeyLvl2ServiceServerMockRecorder {
 	return m.recorder
 }
 
-// DRKeyLvl2 mocks base method
+// DRKeyLvl2 mocks base method.
 func (m *MockDRKeyLvl2ServiceServer) DRKeyLvl2(arg0 context.Context, arg1 *control_plane.DRKeyLvl2Request) (*control_plane.DRKeyLvl2Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DRKeyLvl2", arg0, arg1)
@@ -135,36 +136,36 @@ func (m *MockDRKeyLvl2ServiceServer) DRKeyLvl2(arg0 context.Context, arg1 *contr
 	return ret0, ret1
 }
 
-// DRKeyLvl2 indicates an expected call of DRKeyLvl2
+// DRKeyLvl2 indicates an expected call of DRKeyLvl2.
 func (mr *MockDRKeyLvl2ServiceServerMockRecorder) DRKeyLvl2(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DRKeyLvl2", reflect.TypeOf((*MockDRKeyLvl2ServiceServer)(nil).DRKeyLvl2), arg0, arg1)
 }
 
-// MockDRKeyLvl1ServiceServer is a mock of DRKeyLvl1ServiceServer interface
+// MockDRKeyLvl1ServiceServer is a mock of DRKeyLvl1ServiceServer interface.
 type MockDRKeyLvl1ServiceServer struct {
 	ctrl     *gomock.Controller
 	recorder *MockDRKeyLvl1ServiceServerMockRecorder
 }
 
-// MockDRKeyLvl1ServiceServerMockRecorder is the mock recorder for MockDRKeyLvl1ServiceServer
+// MockDRKeyLvl1ServiceServerMockRecorder is the mock recorder for MockDRKeyLvl1ServiceServer.
 type MockDRKeyLvl1ServiceServerMockRecorder struct {
 	mock *MockDRKeyLvl1ServiceServer
 }
 
-// NewMockDRKeyLvl1ServiceServer creates a new mock instance
+// NewMockDRKeyLvl1ServiceServer creates a new mock instance.
 func NewMockDRKeyLvl1ServiceServer(ctrl *gomock.Controller) *MockDRKeyLvl1ServiceServer {
 	mock := &MockDRKeyLvl1ServiceServer{ctrl: ctrl}
 	mock.recorder = &MockDRKeyLvl1ServiceServerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDRKeyLvl1ServiceServer) EXPECT() *MockDRKeyLvl1ServiceServerMockRecorder {
 	return m.recorder
 }
 
-// DRKeyLvl1 mocks base method
+// DRKeyLvl1 mocks base method.
 func (m *MockDRKeyLvl1ServiceServer) DRKeyLvl1(arg0 context.Context, arg1 *drkey.DRKeyLvl1Request) (*drkey.DRKeyLvl1Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DRKeyLvl1", arg0, arg1)
@@ -173,7 +174,7 @@ func (m *MockDRKeyLvl1ServiceServer) DRKeyLvl1(arg0 context.Context, arg1 *drkey
 	return ret0, ret1
 }
 
-// DRKeyLvl1 indicates an expected call of DRKeyLvl1
+// DRKeyLvl1 indicates an expected call of DRKeyLvl1.
 func (mr *MockDRKeyLvl1ServiceServerMockRecorder) DRKeyLvl1(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DRKeyLvl1", reflect.TypeOf((*MockDRKeyLvl1ServiceServer)(nil).DRKeyLvl1), arg0, arg1)
