@@ -17,6 +17,8 @@ go_library(
         "//go/lib/snet:go_default_library",
         "@com_github_lucas_clemente_quic_go//:go_default_library",
         "@com_github_lucas_clemente_quic_go//flowtele:go_default_library",
+        "@com_github_lucas_clemente_quic_go//logging:go_default_library",
+        "@com_github_lucas_clemente_quic_go//qlog:go_default_library",
         "@com_github_pkg_profile//:go_default_library",
         "@in_gopkg_alecthomas_kingpin_v2//:go_default_library",
     ],

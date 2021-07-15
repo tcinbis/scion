@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/lucas-clemente/quic-go/logging"
+	"github.com/lucas-clemente/quic-go/qlog"
 	"github.com/pkg/profile"
 	"github.com/scionproto/scion/go/flowtele/utils"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -442,19 +446,20 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 	}
 	log.Info(fmt.Sprintf("Configuring QUIC"))
 	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(newSrttMeasurement, packetsLost, packetsAcked)
-	//tracer := qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
-	//	filename := fmt.Sprintf("client_%x.qlog", connID)
-	//	f, err := os.Create(filename)
-	//	if err != nil {
-	//		log.Error(fmt.Sprintf("Tracer error: %v\n", err))
-	//	}
-	//	log.Info(fmt.Sprintf("Creating qlog file %s.\n", filename))
-	//	return NewBufferedWriteCloser(bufio.NewWriter(f), f)
-	//})
+	tracer := qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+		filename := fmt.Sprintf("client_%x.qlog", connID)
+		f, err := os.Create(filename)
+		if err != nil {
+			log.Error(fmt.Sprintf("Tracer error: %v\n", err))
+		}
+		log.Info(fmt.Sprintf("Creating qlog file %s.\n", filename))
+		return NewBufferedWriteCloser(bufio.NewWriter(f), f)
+	})
 	// make QUIC idle timout long to allow a delay between starting the listeners and the senders
 	//quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
 	//	FlowTeleSignal: flowteleSignalInterface, Tracer: tracer}
 	quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
+		Tracer:         tracer,
 		FlowTeleSignal: flowteleSignalInterface}
 	tlsConfig := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"Flowtele"}}
 
@@ -562,4 +567,24 @@ func checkFlowTeleSession(s quic.Session) quic.FlowTeleSession {
 		panic("Returned session is not flowtele sessions")
 	}
 	return fs
+}
+
+type bufferedWriteCloser struct {
+	*bufio.Writer
+	io.Closer
+}
+
+// NewBufferedWriteCloser creates an io.WriteCloser from a bufio.Writer and an io.Closer
+func NewBufferedWriteCloser(writer *bufio.Writer, closer io.Closer) io.WriteCloser {
+	return &bufferedWriteCloser{
+		Writer: writer,
+		Closer: closer,
+	}
+}
+
+func (h bufferedWriteCloser) Close() error {
+	if err := h.Writer.Flush(); err != nil {
+		return err
+	}
+	return h.Closer.Close()
 }
