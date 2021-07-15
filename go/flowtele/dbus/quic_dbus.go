@@ -120,6 +120,10 @@ func (qdb *QuicDbus) SendLostSignal(t time.Time, newSsthresh uint32) error {
 	return qdb.Send(CreateQuicDbusSignalLost(qdb.FlowId, t, newSsthresh))
 }
 
+func (qdb *QuicDbus) SendLostRatioSignal(t time.Time, ratio float64) error {
+	return qdb.Send(CreateQuicDbusSignalLostRatio(qdb.FlowId, t, ratio))
+}
+
 func (qdb *QuicDbus) SendCwndSignal(t time.Time, cwnd uint32, pktsInFlight int32, ackedBytes uint32) error {
 	return qdb.Send(CreateQuicDbusSignalCwnd(qdb.FlowId, t, cwnd, pktsInFlight, ackedBytes))
 }

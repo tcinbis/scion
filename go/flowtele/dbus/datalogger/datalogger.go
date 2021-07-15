@@ -29,6 +29,12 @@ type CwndData struct {
 	Cwnd      uint64
 }
 
+type LostRatioData struct {
+	FlowID    int
+	Timestamp time.Time
+	LostRatio float64
+}
+
 type DbusDataLogger struct {
 	writerChan chan channelData
 	abortChan  chan struct{}
@@ -124,6 +130,10 @@ func (r *RTTData) Strings() []string {
 
 func (c *CwndData) Strings() []string {
 	return []string{strconv.Itoa(c.FlowID), strconv.Itoa(int(UnixMicroseconds(c.Timestamp))), strconv.FormatUint(c.Cwnd, 10)}
+}
+
+func (c *LostRatioData) Strings() []string {
+	return []string{strconv.Itoa(c.FlowID), strconv.Itoa(int(UnixMicroseconds(c.Timestamp))), strconv.FormatFloat(c.LostRatio, 'f', 5, 64)}
 }
 
 func UnixMicroseconds(t time.Time) int64 {

@@ -6,8 +6,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/lucas-clemente/quic-go/logging"
-	"github.com/lucas-clemente/quic-go/qlog"
 	"github.com/pkg/profile"
 	"github.com/scionproto/scion/go/flowtele/utils"
 	"io"
@@ -406,6 +404,24 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 			}
 		}
 	}
+
+	lostRatioDataLogger := datalogger.NewDbusDataLogger(
+		fmt.Sprintf(
+			"lostRatios-%d-%s-f%d.csv", time.Now().Unix(), utils.CleanStringForFS(remoteAddr.String()), flowId,
+		),
+		[]string{"flowID", "microTimestamp", "lostRatio"},
+		metadataHeader,
+		&loggerWait,
+	)
+	defer lostRatioDataLogger.Close()
+	lostRatioDataLogger.SetMetadata([]string{localAddr.String(), remoteAddr.String()})
+	lostRatioDataLogger.Run()
+
+	packetsLostRatio := func(t time.Time, lostRatio float64) {
+		lostRatioDataLogger.Send(&datalogger.LostRatioData{FlowID: int(flowId), Timestamp: t, LostRatio: lostRatio})
+		qdbus.Log("loss ratio: %f%%", lostRatio*100)
+	}
+
 	cwndDataLogger := datalogger.NewDbusDataLogger(
 		fmt.Sprintf(
 			"cwnd-samples-%d-%s-f%d.csv", time.Now().Unix(), utils.CleanStringForFS(remoteAddr.String()), flowId,
@@ -445,21 +461,21 @@ func startQuicSender(localAddr *net.UDPAddr, remoteAddr *net.UDPAddr, flowId int
 		}
 	}
 	log.Info(fmt.Sprintf("Configuring QUIC"))
-	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(newSrttMeasurement, packetsLost, packetsAcked)
-	tracer := qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
-		filename := fmt.Sprintf("client_%x.qlog", connID)
-		f, err := os.Create(filename)
-		if err != nil {
-			log.Error(fmt.Sprintf("Tracer error: %v\n", err))
-		}
-		log.Info(fmt.Sprintf("Creating qlog file %s.\n", filename))
-		return NewBufferedWriteCloser(bufio.NewWriter(f), f)
-	})
+	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(newSrttMeasurement, packetsLost, packetsLostRatio, packetsAcked)
+	//tracer := qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+	//	filename := fmt.Sprintf("client_%x.qlog", connID)
+	//	f, err := os.Create(filename)
+	//	if err != nil {
+	//		log.Error(fmt.Sprintf("Tracer error: %v\n", err))
+	//	}
+	//	log.Info(fmt.Sprintf("Creating qlog file %s.\n", filename))
+	//	return NewBufferedWriteCloser(bufio.NewWriter(f), f)
+	//})
 	// make QUIC idle timout long to allow a delay between starting the listeners and the senders
 	//quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
 	//	FlowTeleSignal: flowteleSignalInterface, Tracer: tracer}
 	quicConfig := &quic.Config{MaxIdleTimeout: time.Hour,
-		Tracer:         tracer,
+		//Tracer:         tracer,
 		FlowTeleSignal: flowteleSignalInterface}
 	tlsConfig := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"Flowtele"}}
 

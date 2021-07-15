@@ -27,6 +27,7 @@ const (
 	Delivered
 	DeliveredAdjust
 	GainLost
+	LostRatio
 )
 
 type dbusSignalStruct struct {
@@ -137,6 +138,20 @@ func createReportDbusSignalUint32Int32Uint32(t QuicDbusSignalType, flow int32, t
 		v0,
 		v1,
 		v2,
+	}}
+}
+
+func createReportDbusSignalFloat64(t QuicDbusSignalType, flow int32, time time.Time, v0 float64) DbusSignal {
+	return &dbusSignalStruct{t, struct {
+		Flow   int32
+		TvSec  uint64
+		TvNsec uint32
+		V0     float64
+	}{
+		int32(flow),
+		uint64(time.Unix()),
+		uint32(time.Nanosecond()),
+		v0,
 	}}
 }
 
