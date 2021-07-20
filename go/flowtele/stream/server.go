@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/flowtele"
 	"github.com/lucas-clemente/quic-go/http3"
+	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsec-ethz/scion-apps/pkg/shttp"
 	slog "github.com/scionproto/scion/go/lib/log"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -87,10 +89,13 @@ func getQuicConf() *quic.Config {
 func startTCPServer(handler http.Handler) {
 	fmt.Printf("Using QUIC\n")
 	addr := fmt.Sprintf("%s:%d", *ip, *port)
-	certFile := "/home/tom/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/fullchain5.pem"
-	keyFile := "/home/tom/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/privkey5.pem"
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal("Error getting user home dir.")
+	}
+	certFile := filepath.Join(userHome, "/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/fullchain5.pem")
+	keyFile := filepath.Join(userHome, "/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/privkey5.pem")
 	certs := make([]tls.Certificate, 1)
-	var err error
 	certs[0], err = tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		log.Fatal(err)
@@ -137,8 +142,6 @@ func startTCPServer(handler http.Handler) {
 	}()
 
 	for {
-		//tm.MoveCursor(1,1)
-		//tm.Printf("Sessions stored: %d\n", len(*quicServer.GetSessions()))
 		//ids := make([]string, len(*quicServer.GetSessions()))
 		//for key, val := range *quicServer.GetSessions() {
 		//	ids = append(ids, fmt.Sprintf("ConnectionID: %s - %d\n", key, val))
@@ -147,12 +150,7 @@ func startTCPServer(handler http.Handler) {
 		//for _, s := range ids {
 		//	tm.Println(s)
 		//}
-		//
-		//tm.Println()
-		//tm.Printf(time.Now().String())
-		//tm.Flush()
 		time.Sleep(1 * time.Second)
-		//tm.Clear()
 	}
 
 	//http.Handle("/", handler)
@@ -161,16 +159,43 @@ func startTCPServer(handler http.Handler) {
 
 func startSCIONServer(handler http.Handler) {
 	fmt.Printf("Using SCION\n")
+	addr := fmt.Sprintf("%s:%d", *ip, *port)
 
-	server := shttp.NewScionServer(fmt.Sprintf("%s:%d", *ip, *port), withLogger(handler), nil, getQuicConf())
+	server := shttp.NewScionServer(addr, withLogger(handler), nil, getQuicConf())
 	server.Server.SetNewStreamCallback(func(sess *quic.EarlySession, strID quic.StreamID) {
 		fmt.Printf("%v %v\n", time.Now(), sess)
 		fmt.Printf("%v: Session to %s open.\n", time.Now(), (*sess).RemoteAddr())
 		fmt.Printf("%v %v\n", time.Now(), server.Server.GetSessions())
-		(*checkFlowTeleSession(checkSession(sess))).SetFixedRate(500 * KByte)
+		//(*checkFlowTeleSession(checkSession(sess))).SetFixedRate(500 * KByte)
 	})
 
-	log.Fatal(server.ListenAndServe())
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		server.SetQuicHeaders(w.Header())
+		w.Header().Add("Access-Control-Allow-Headers", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Methods", "*")
+		log.Printf("%s", r.RequestURI)
+		handler.ServeHTTP(w, r)
+	})
+
+	server.Handler = mux
+	udpPacketCon, err := pan.ListenUDP(context.Background(), &net.UDPAddr{Port: int(*port)}, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		defer slog.HandlePanic()
+
+		server.Serve(udpPacketCon)
+	}()
+	for {
+		time.Sleep(1 * time.Second)
+		//udpPacketCon.GetSelector().ReplyPath()
+
+	}
+
+	//log.Fatal(server.ListenAndServe())
 }
 
 func main() {
