@@ -13,11 +13,10 @@ require (
 	github.com/go-chi/cors v1.1.1
 	github.com/go-kit/kit v0.10.0
 	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/godbus/dbus/v5 v5.0.4
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.5
-	github.com/godbus/dbus/v5 v5.0.4
-	github.com/google/go-querystring v1.0.1-0.20190318165438-c8c88dbee036 // indirect
 	github.com/google/gopacket v1.1.16-0.20190123011826-102d5ca2098c
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -28,7 +27,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mattn/go-sqlite3 v1.14.4
-	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
+	github.com/netsec-ethz/scion-apps v0.3.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.1-0.20180815053127-5633e0862627+incompatible
 	github.com/pelletier/go-toml v1.9.3
@@ -61,11 +60,11 @@ replace github.com/nxadm/tail => github.com/lukedirtwalker/tail v1.3.1-0.2019091
 
 replace github.com/smartystreets/goconvey => github.com/kormat/goconvey v0.0.0-20191113114839-63cc4eee0dbc
 
-replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.19.2-rc-25-flowtele
+replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.21.0-flowtele-rc-1
 
 //replace github.com/lucas-clemente/quic-go => ../quic-go
 
-replace github.com/netsec-ethz/scion-apps v0.3.0 => github.com/tcinbis/scion-apps v0.3.2
+replace github.com/netsec-ethz/scion-apps v0.3.0 => github.com/tcinbis/scion-apps v0.3.3
 
 //replace github.com/netsec-ethz/scion-apps => ../scion-apps
 

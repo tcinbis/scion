@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	errorNoError quic.ErrorCode = 0x100
+	errorNoError quic.ApplicationErrorCode = 0x100
 )
 
 var (
