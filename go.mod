@@ -60,7 +60,7 @@ replace github.com/nxadm/tail => github.com/lukedirtwalker/tail v1.3.1-0.2019091
 
 replace github.com/smartystreets/goconvey => github.com/kormat/goconvey v0.0.0-20191113114839-63cc4eee0dbc
 
-replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.21.0-flowtele-rc-1
+replace github.com/lucas-clemente/quic-go => github.com/tcinbis/quic-go v0.21.1-flowtele-rc-1
 
 //replace github.com/lucas-clemente/quic-go => ../quic-go
 
