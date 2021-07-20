@@ -65,21 +65,20 @@ func getUDPConn(addr string) *net.UDPConn {
 }
 
 func getQuicConf() *quic.Config {
-	newSrttMeasurement := func(t time.Time, srtt time.Duration) {
-		//fmt.Printf("t: %v, srtt: %v\n", t, srtt)
-	}
 
-	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(newSrttMeasurement, func(t time.Time, newSlowStartThreshold uint64) {
+	flowteleSignalInterface := flowtele.CreateFlowteleSignalInterface(func(t time.Time, srtt time.Duration) {
+		//fmt.Printf("t: %v, srtt: %v\n", t, srtt)
+	}, func(t time.Time, newSlowStartThreshold uint64) {
 
 	}, func(t time.Time, lostRatio float64) {
 
-	},
-		func(t time.Time, congestionWindow uint64, packetsInFlight uint64, ackedBytes uint64) {
+	}, func(t time.Time, congestionWindow uint64, packetsInFlight uint64, ackedBytes uint64) {
 
-		})
+	})
+
 	// make QUIC idle timout long to allow a delay between starting the listeners and the senders
 	return &quic.Config{
-		//MaxIdleTimeout: time.Second,
+		//MaxIdleTimeout: 30 * time.Second,
 		//KeepAlive: true,
 		FlowTeleSignal: flowteleSignalInterface,
 	}
@@ -88,37 +87,8 @@ func getQuicConf() *quic.Config {
 func startTCPServer(handler http.Handler) {
 	fmt.Printf("Using QUIC\n")
 	addr := fmt.Sprintf("%s:%d", *ip, *port)
-	certFile := "/home/tom/go/src/scion/go/flowtele/tls.pem"
-	keyFile := "/home/tom/go/src/scion/go/flowtele/tls.key"
-
-	quicServer := http3.Server{
-		Server: &http.Server{
-			Addr: addr,
-		},
-		QuicConfig: getQuicConf(),
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/files", func(w http.ResponseWriter, r *http.Request) {
-		quicServer.SetQuicHeaders(w.Header())
-		handler.ServeHTTP(w, r)
-	})
-	mux.HandleFunc("/demo", func(w http.ResponseWriter, r *http.Request) {
-		quicServer.SetQuicHeaders(w.Header())
-		// Small 40x40 png
-		w.Write([]byte{
-			0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-			0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x28,
-			0x01, 0x03, 0x00, 0x00, 0x00, 0xb6, 0x30, 0x2a, 0x2e, 0x00, 0x00, 0x00,
-			0x03, 0x50, 0x4c, 0x54, 0x45, 0x5a, 0xc3, 0x5a, 0xad, 0x38, 0xaa, 0xdb,
-			0x00, 0x00, 0x00, 0x0b, 0x49, 0x44, 0x41, 0x54, 0x78, 0x01, 0x63, 0x18,
-			0x61, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x01, 0xe2, 0xb8, 0x75, 0x22, 0x00,
-			0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
-		})
-	})
-	//quicServer.Handler = mux
-	quicServer.Server.Handler = mux
-
+	certFile := "/home/tom/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/fullchain5.pem"
+	keyFile := "/home/tom/go/src/scion/go/flowtele/stream/letsencrypt/letsencrypt/live/colasloth.com/privkey5.pem"
 	certs := make([]tls.Certificate, 1)
 	var err error
 	certs[0], err = tls.LoadX509KeyPair(certFile, keyFile)
@@ -129,20 +99,60 @@ func startTCPServer(handler http.Handler) {
 	tlsConfig := &tls.Config{
 		Certificates: certs,
 	}
+
+	quicServer := http3.Server{
+		Server: &http.Server{
+			Addr:      addr,
+			Handler:   handler,
+			TLSConfig: tlsConfig,
+		},
+		QuicConfig: getQuicConf(),
+	}
+	//quicServer.SetLogLevelInfo()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		quicServer.SetQuicHeaders(w.Header())
+		w.Header().Add("Access-Control-Allow-Headers", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Methods", "*")
+		log.Printf("%s", r.RequestURI)
+		handler.ServeHTTP(w, r)
+	})
+
+	quicServer.Handler = mux
+	quicServer.SetNewStreamCallback(func(sess *quic.EarlySession, strID quic.StreamID) {
+		//fmt.Printf("%v: Session to %s open.\n", time.Now(), (*sess).RemoteAddr())
+		//(*checkFlowTeleSession(checkSession(sess))).SetFixedRate(2.5 * MBit)
+	})
+
 	go func() {
 		defer slog.HandlePanic()
 		quicServer.Server.Serve(tls.NewListener(getTCPConn(addr), tlsConfig))
 	}()
+	//quicServer.ListenAndServeTLS(certFile, keyFile)
 	go func() {
 		defer slog.HandlePanic()
 		quicServer.Serve(getUDPConn(addr))
 	}()
 
 	for {
-		//for key, _ := range *quicServer.GetSessions() {
-		//	fmt.Printf("ConnectionID: %s\n", (*key).ConnectionId())
+		//tm.MoveCursor(1,1)
+		//tm.Printf("Sessions stored: %d\n", len(*quicServer.GetSessions()))
+		//ids := make([]string, len(*quicServer.GetSessions()))
+		//for key, val := range *quicServer.GetSessions() {
+		//	ids = append(ids, fmt.Sprintf("ConnectionID: %s - %d\n", key, val))
 		//}
+		//sort.Strings(ids)
+		//for _, s := range ids {
+		//	tm.Println(s)
+		//}
+		//
+		//tm.Println()
+		//tm.Printf(time.Now().String())
+		//tm.Flush()
 		time.Sleep(1 * time.Second)
+		//tm.Clear()
 	}
 
 	//http.Handle("/", handler)
