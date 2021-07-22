@@ -71,8 +71,10 @@ func GetScionQuicListener(dispatcher string, sciondAddr string, localAddr *net.U
 		return nil, fmt.Errorf("Unable to initialize SCION network (%s)", err)
 	}
 	network := snet.NewNetwork(localIA, reliable.NewDispatcher(dispatcher), sd.RevHandler{Connector: sciondConn})
-	if err = squic.Init(*quicKeyPath, *quicPemPath); err != nil {
-		return nil, fmt.Errorf("Unable to load TLS server certificates: %s", err)
+	if *quicKeyPath != "" && *quicPemPath != "" {
+		if err = squic.Init(*quicKeyPath, *quicPemPath); err != nil {
+			return nil, fmt.Errorf("Unable to load TLS server certificates: %s", err)
+		}
 	}
 	log.Debug(fmt.Sprintf("Listening on %v to with cfg %v\n", localAddr, quicConfig))
 	return squic.Listen(network, localAddr, addr.SvcNone, quicConfig)

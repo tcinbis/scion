@@ -179,6 +179,7 @@ loop:
 
 func main() {
 	errs := make(chan error)
+	utils.SetupLogger()
 
 	// capture interrupts to gracefully terminate run
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
