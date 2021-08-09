@@ -640,8 +640,6 @@ github.com/subosito/gotenv v1.2.0 h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=
-github.com/tcinbis/quic-go v0.21.1-flowtele-rc-2 h1:aIJZiiWv/TVNF0bk8t6zigJfdHMtjrCQBON/MUWgU2w=
-github.com/tcinbis/quic-go v0.21.1-flowtele-rc-2/go.mod h1:vF5M1XqhBAHgbjKcJOXY3JZz3GP0T3FQhz/uyOUS38Q=
 github.com/tcinbis/scion-apps v0.3.5 h1:6Gtzbe2zA32DUxOqLewQR5ofCUo6ZXjZKb42jgnUQhg=
 github.com/tcinbis/scion-apps v0.3.5/go.mod h1:nyr4vD5eAoWW71p5ZMUTmYtrk63KU8S2pF5jZEldRbs=
 github.com/tinylib/msgp v1.1.0/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
