@@ -48,7 +48,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/net v0.0.0-20210505024714-0287a6fb4125
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/tools v0.1.2
+	golang.org/x/tools v0.1.5
 	google.golang.org/grpc v1.38.1
 	google.golang.org/grpc/examples v0.0.0-20210630181457-52546c5d89b7
 	google.golang.org/protobuf v1.26.0
